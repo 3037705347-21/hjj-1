@@ -26,10 +26,3 @@ dist-ssr
 *.sln
 *.sw?
 .vite
-
-# Frontend admin
-frontend-admin/node_modules
-frontend-admin/dist
-frontend-admin/.vite
-frontend-admin/.env.local
-frontend-admin/.env.*.local

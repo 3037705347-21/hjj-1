@@ -91,12 +91,14 @@ onMounted(() => {
   <div class="space-y-6">
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
       <div
-        @click="goToReagents"
         class="bg-white rounded-xl p-6 shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer hover:-translate-y-1"
+        @click="goToReagents"
       >
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-sm text-gray-500 mb-1">试剂总数</p>
+            <p class="text-sm text-gray-500 mb-1">
+              试剂总数
+            </p>
             <p class="text-3xl font-bold text-gray-800">
               {{ loading ? '--' : stats?.reagentCount || 0 }}
             </p>
@@ -112,12 +114,14 @@ onMounted(() => {
       </div>
 
       <div
-        @click="goToConsumables"
         class="bg-white rounded-xl p-6 shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer hover:-translate-y-1"
+        @click="goToConsumables"
       >
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-sm text-gray-500 mb-1">耗材总数</p>
+            <p class="text-sm text-gray-500 mb-1">
+              耗材总数
+            </p>
             <p class="text-3xl font-bold text-gray-800">
               {{ loading ? '--' : stats?.consumableCount || 0 }}
             </p>
@@ -133,12 +137,14 @@ onMounted(() => {
       </div>
 
       <div
-        @click="goToBatches"
         class="bg-white rounded-xl p-6 shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer hover:-translate-y-1"
+        @click="goToBatches"
       >
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-sm text-gray-500 mb-1">近效期试剂</p>
+            <p class="text-sm text-gray-500 mb-1">
+              近效期试剂
+            </p>
             <p class="text-3xl font-bold text-warning-600">
               {{ loading ? '--' : stats?.expiringCount || 0 }}
             </p>
@@ -154,12 +160,14 @@ onMounted(() => {
       </div>
 
       <div
-        @click="goToConsumables"
         class="bg-white rounded-xl p-6 shadow-card hover:shadow-card-hover transition-all duration-300 cursor-pointer hover:-translate-y-1"
+        @click="goToConsumables"
       >
         <div class="flex items-start justify-between">
           <div>
-            <p class="text-sm text-gray-500 mb-1">低库存预警</p>
+            <p class="text-sm text-gray-500 mb-1">
+              低库存预警
+            </p>
             <p class="text-3xl font-bold text-danger-600">
               {{ loading ? '--' : stats?.lowStockCount || 0 }}
             </p>
@@ -178,15 +186,23 @@ onMounted(() => {
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div class="lg:col-span-2 bg-white rounded-xl p-6 shadow-card">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="text-lg font-semibold text-gray-800">出入库趋势</h3>
+          <h3 class="text-lg font-semibold text-gray-800">
+            出入库趋势
+          </h3>
           <span class="text-xs text-gray-400">近30天</span>
         </div>
 
-        <div v-if="loading" class="h-64 flex items-center justify-center">
-          <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+        <div
+          v-if="loading"
+          class="h-64 flex items-center justify-center"
+        >
+          <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
         </div>
 
-        <div v-else class="h-64 flex items-end gap-2 px-2">
+        <div
+          v-else
+          class="h-64 flex items-end gap-2 px-2"
+        >
           <div
             v-for="item in stats?.trendData"
             :key="item.date"
@@ -197,12 +213,12 @@ onMounted(() => {
                 class="w-full bg-success-500/80 rounded-t transition-all duration-300 group-hover:bg-success-600"
                 :style="{ height: `${(item.inbound / maxTrendValue) * 100}%` }"
                 :title="`入库: ${item.inbound}`"
-              ></div>
+              />
               <div
                 class="w-full bg-primary-500/80 rounded-t transition-all duration-300 group-hover:bg-primary-600"
                 :style="{ height: `${(item.outbound / maxTrendValue) * 100}%` }"
                 :title="`出库: ${item.outbound}`"
-              ></div>
+              />
             </div>
             <span class="text-xs text-gray-400 truncate w-full text-center">
               {{ item.date }}
@@ -212,11 +228,11 @@ onMounted(() => {
 
         <div class="flex items-center justify-center gap-6 mt-4 pt-4 border-t border-gray-100">
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded bg-success-500"></div>
+            <div class="w-3 h-3 rounded bg-success-500" />
             <span class="text-sm text-gray-600">入库</span>
           </div>
           <div class="flex items-center gap-2">
-            <div class="w-3 h-3 rounded bg-primary-500"></div>
+            <div class="w-3 h-3 rounded bg-primary-500" />
             <span class="text-sm text-gray-600">出库</span>
           </div>
         </div>
@@ -224,17 +240,28 @@ onMounted(() => {
 
       <div class="bg-white rounded-xl p-6 shadow-card">
         <div class="flex items-center justify-between mb-6">
-          <h3 class="text-lg font-semibold text-gray-800">分类统计</h3>
+          <h3 class="text-lg font-semibold text-gray-800">
+            分类统计
+          </h3>
           <span class="text-xs text-gray-400">试剂分布</span>
         </div>
 
-        <div v-if="loading" class="h-64 flex items-center justify-center">
-          <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+        <div
+          v-if="loading"
+          class="h-64 flex items-center justify-center"
+        >
+          <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
         </div>
 
-        <div v-else class="flex flex-col items-center">
+        <div
+          v-else
+          class="flex flex-col items-center"
+        >
           <div class="relative w-40 h-40">
-            <svg viewBox="0 0 100 100" class="transform -rotate-90">
+            <svg
+              viewBox="0 0 100 100"
+              class="transform -rotate-90"
+            >
               <circle
                 v-for="(cat, index) in stats?.categoryStats"
                 :key="cat.name"
@@ -264,7 +291,7 @@ onMounted(() => {
                 <div
                   class="w-2.5 h-2.5 rounded-full"
                   :style="{ backgroundColor: categoryColors[index % categoryColors.length] }"
-                ></div>
+                />
                 <span class="text-gray-600">{{ cat.name }}</span>
               </div>
               <span class="font-medium text-gray-800">{{ cat.value }}</span>
@@ -277,27 +304,40 @@ onMounted(() => {
     <div class="bg-white rounded-xl shadow-card overflow-hidden">
       <div class="flex items-center justify-between p-6 border-b border-gray-100">
         <div>
-          <h3 class="text-lg font-semibold text-gray-800">效期预警</h3>
-          <p class="text-sm text-gray-500 mt-1">即将过期和已过期的试剂批次</p>
+          <h3 class="text-lg font-semibold text-gray-800">
+            效期预警
+          </h3>
+          <p class="text-sm text-gray-500 mt-1">
+            即将过期和已过期的试剂批次
+          </p>
         </div>
         <button
-          @click="goToBatches"
           class="flex items-center gap-1 px-4 py-2 text-sm text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+          @click="goToBatches"
         >
           查看全部
           <ChevronRight class="w-4 h-4" />
         </button>
       </div>
 
-      <div v-if="loading" class="p-12 flex items-center justify-center">
-        <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+      <div
+        v-if="loading"
+        class="p-12 flex items-center justify-center"
+      >
+        <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
       </div>
 
-      <div v-else-if="expiringBatches.length === 0" class="p-12 text-center text-gray-400">
+      <div
+        v-else-if="expiringBatches.length === 0"
+        class="p-12 text-center text-gray-400"
+      >
         暂无效期预警数据
       </div>
 
-      <div v-else class="overflow-x-auto">
+      <div
+        v-else
+        class="overflow-x-auto"
+      >
         <table class="w-full">
           <thead class="bg-gray-50">
             <tr>
@@ -332,13 +372,17 @@ onMounted(() => {
               }"
             >
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="font-medium text-gray-900">{{ batch.reagentName }}</div>
+                <div class="font-medium text-gray-900">
+                  {{ batch.reagentName }}
+                </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap font-mono text-sm text-gray-600">
                 {{ batch.batchNumber }}
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
-                <div class="text-gray-900">{{ formatDate(batch.expiryDate) }}</div>
+                <div class="text-gray-900">
+                  {{ formatDate(batch.expiryDate) }}
+                </div>
                 <div
                   class="text-xs mt-0.5"
                   :class="batch.status === 'expired' ? 'text-danger-600' : 'text-warning-600'"

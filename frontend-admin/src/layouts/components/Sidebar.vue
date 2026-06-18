@@ -64,8 +64,8 @@ const handleLogout = async () => {
       </div>
       <button
         v-if="!collapsed"
-        @click="emit('toggle')"
         class="ml-auto p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+        @click="emit('toggle')"
       >
         <X class="w-4 h-4" />
       </button>
@@ -84,13 +84,19 @@ const handleLogout = async () => {
         ]"
       >
         <div class="relative flex-shrink-0">
-          <component :is="item.icon" class="w-5 h-5" />
+          <component
+            :is="item.icon"
+            class="w-5 h-5"
+          />
           <div
             v-if="isActive(item.path)"
             class="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-6 bg-white rounded-r-full"
-          ></div>
+          />
         </div>
-        <span v-if="!collapsed" class="text-sm font-medium whitespace-nowrap">
+        <span
+          v-if="!collapsed"
+          class="text-sm font-medium whitespace-nowrap"
+        >
           {{ item.name }}
         </span>
       </router-link>
@@ -101,18 +107,25 @@ const handleLogout = async () => {
         v-if="!collapsed"
         class="mb-2 px-3 py-2 rounded-lg bg-white/5"
       >
-        <div class="text-xs text-primary-200/70">当前用户</div>
-        <div class="text-sm font-medium truncate">{{ userStore.state.user?.name || '未登录' }}</div>
+        <div class="text-xs text-primary-200/70">
+          当前用户
+        </div>
+        <div class="text-sm font-medium truncate">
+          {{ userStore.state.user?.name || '未登录' }}
+        </div>
         <div class="text-xs text-primary-200/60">
           {{ userStore.state.user?.role ? roleLabels[userStore.state.user.role] : '' }}
         </div>
       </div>
       <button
-        @click="handleLogout"
         class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-primary-100/80 hover:bg-white/10 hover:text-white transition-all duration-200"
+        @click="handleLogout"
       >
         <LogOut class="w-5 h-5 flex-shrink-0" />
-        <span v-if="!collapsed" class="text-sm font-medium whitespace-nowrap">
+        <span
+          v-if="!collapsed"
+          class="text-sm font-medium whitespace-nowrap"
+        >
           退出登录
         </span>
       </button>
@@ -121,8 +134,8 @@ const handleLogout = async () => {
 
   <button
     v-if="collapsed"
-    @click="emit('toggle')"
     class="fixed left-16 top-4 z-40 p-2 rounded-lg bg-white shadow-lg hover:bg-gray-50 transition-all duration-200 hover:shadow-xl"
+    @click="emit('toggle')"
   >
     <Menu class="w-5 h-5 text-gray-600" />
   </button>

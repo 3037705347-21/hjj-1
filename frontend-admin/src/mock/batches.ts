@@ -54,8 +54,8 @@ function updateBatchStatus(batch: ReagentBatch): ReagentBatch {
 function initMockBatches(): ReagentBatch[] {
   const reagentsData = localStorage.getItem('mock_reagents')
   let reagentIds: string[] = []
-  let reagentNames: Record<string, string> = {}
-  let reagentUnits: Record<string, string> = {}
+  const reagentNames: Record<string, string> = {}
+  const reagentUnits: Record<string, string> = {}
   
   if (reagentsData) {
     try {
@@ -65,7 +65,9 @@ function initMockBatches(): ReagentBatch[] {
         reagentNames[r.id] = r.name
         reagentUnits[r.id] = r.unit
       })
-    } catch {}
+    } catch {
+      // 忽略解析错误，使用默认数据
+    }
   }
   
   if (reagentIds.length === 0) {
@@ -324,7 +326,7 @@ export async function mockGetBatches(
 }
 
 export function mockGetBatch(id: string): Promise<(ReagentBatch & { operations: BatchOperation[] }) | null> {
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     setTimeout(() => {
       const batches = getBatchesFromStorage().map(updateBatchStatus)
       const batch = batches.find(b => b.id === id)
@@ -345,7 +347,7 @@ export function mockGetBatch(id: string): Promise<(ReagentBatch & { operations: 
 }
 
 export function mockCreateBatch(data: BatchFormData): Promise<ReagentBatch> {
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     setTimeout(async () => {
       const batches = getBatchesFromStorage()
       const reagents = await mockGetAllReagents()
@@ -434,14 +436,17 @@ export function mockGetExpiringBatches(days: number = 30): Promise<ReagentBatch[
     setTimeout(() => {
       const batches = getBatchesFromStorage().map(updateBatchStatus)
       const expiring = batches
-        .filter(b => b.status === 'warning' || b.status === 'expired')
+        .filter(b => {
+          const expiryDays = getExpiryDays(b.expiryDate)
+          return expiryDays <= days || b.status === 'expired'
+        })
         .sort((a, b) => {
           const daysA = getExpiryDays(a.expiryDate)
           const daysB = getExpiryDays(b.expiryDate)
           return daysA - daysB
         })
         .slice(0, 10)
-      
+
       resolve(expiring)
     }, 200)
   })

@@ -269,7 +269,7 @@ onMounted(() => {
               placeholder="搜索批次号、试剂名称..."
               class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
               @keyup.enter="handleSearch"
-            />
+            >
           </div>
         </div>
         
@@ -277,8 +277,14 @@ onMounted(() => {
           v-model="searchForm.reagentId"
           class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white min-w-[180px]"
         >
-          <option value="">全部试剂</option>
-          <option v-for="r in reagents" :key="r.id" :value="r.id">
+          <option value="">
+            全部试剂
+          </option>
+          <option
+            v-for="r in reagents"
+            :key="r.id"
+            :value="r.id"
+          >
             {{ r.name }}
           </option>
         </select>
@@ -287,30 +293,40 @@ onMounted(() => {
           v-model="searchForm.status"
           class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
         >
-          <option value="">全部状态</option>
-          <option value="normal">正常</option>
-          <option value="warning">即将过期</option>
-          <option value="expired">已过期</option>
-          <option value="exhausted">已耗尽</option>
+          <option value="">
+            全部状态
+          </option>
+          <option value="normal">
+            正常
+          </option>
+          <option value="warning">
+            即将过期
+          </option>
+          <option value="expired">
+            已过期
+          </option>
+          <option value="exhausted">
+            已耗尽
+          </option>
         </select>
         
         <button
-          @click="handleSearch"
           class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+          @click="handleSearch"
         >
           搜索
         </button>
         
         <button
-          @click="handleReset"
           class="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
+          @click="handleReset"
         >
           重置
         </button>
         
         <button
-          @click="openCreateModal"
           class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all flex items-center gap-2 shadow-md shadow-primary-500/20"
+          @click="openCreateModal"
         >
           <Plus class="w-4 h-4" />
           录入批次
@@ -322,11 +338,13 @@ onMounted(() => {
       <div
         v-for="r in reagents.slice(0, 4)"
         :key="r.id"
-        @click="filterByReagent(r.id)"
         class="bg-white rounded-xl p-4 shadow-card cursor-pointer hover:shadow-card-hover transition-all duration-200"
         :class="{ 'ring-2 ring-primary-500': searchForm.reagentId === r.id }"
+        @click="filterByReagent(r.id)"
       >
-        <div class="text-sm text-gray-500 mb-1">{{ r.name }}</div>
+        <div class="text-sm text-gray-500 mb-1">
+          {{ r.name }}
+        </div>
         <div class="text-lg font-semibold text-gray-800">
           {{ data?.list.filter(b => b.reagentId === r.id).length || 0 }} 批次
         </div>
@@ -334,8 +352,11 @@ onMounted(() => {
     </div>
 
     <div class="bg-white rounded-xl shadow-card overflow-hidden">
-      <div v-if="loading" class="p-16 flex items-center justify-center">
-        <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+      <div
+        v-if="loading"
+        class="p-16 flex items-center justify-center"
+      >
+        <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
       </div>
       
       <div v-else>
@@ -378,13 +399,17 @@ onMounted(() => {
                 @click="openDetailModal(batch.id)"
               >
                 <td class="px-6 py-4">
-                  <div class="font-medium text-gray-900">{{ batch.reagentName }}</div>
+                  <div class="font-medium text-gray-900">
+                    {{ batch.reagentName }}
+                  </div>
                 </td>
                 <td class="px-6 py-4 font-mono text-sm text-gray-600">
                   {{ batch.batchNumber }}
                 </td>
                 <td class="px-6 py-4">
-                  <div class="text-gray-900">{{ formatDate(batch.expiryDate) }}</div>
+                  <div class="text-gray-900">
+                    {{ formatDate(batch.expiryDate) }}
+                  </div>
                   <div
                     class="text-xs mt-0.5 flex items-center gap-1"
                     :class="{
@@ -393,7 +418,10 @@ onMounted(() => {
                       'text-gray-400': batch.status === 'normal' || batch.status === 'exhausted',
                     }"
                   >
-                    <AlertTriangle v-if="batch.status === 'warning' || batch.status === 'expired'" class="w-3 h-3" />
+                    <AlertTriangle
+                      v-if="batch.status === 'warning' || batch.status === 'expired'"
+                      class="w-3 h-3"
+                    />
                     {{ getDaysLabel(batch) }}
                   </div>
                 </td>
@@ -409,7 +437,7 @@ onMounted(() => {
                             'bg-danger-500': getUsagePercentage(batch) >= 80,
                           }"
                           :style="{ width: `${100 - getUsagePercentage(batch)}%` }"
-                        ></div>
+                        />
                       </div>
                     </div>
                     <div class="text-sm">
@@ -432,20 +460,23 @@ onMounted(() => {
                     {{ batchStatusLabels[batch.status] }}
                   </span>
                 </td>
-                <td class="px-6 py-4" @click.stop>
+                <td
+                  class="px-6 py-4"
+                  @click.stop
+                >
                   <div class="flex items-center justify-center gap-2">
                     <button
-                      @click="openDetailModal(batch.id)"
                       class="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
                       title="查看详情"
+                      @click="openDetailModal(batch.id)"
                     >
                       <Eye class="w-4 h-4" />
                     </button>
                     <button
                       v-if="batch.status !== 'expired' && batch.status !== 'exhausted'"
-                      @click="openOutboundModal(batch.id)"
                       class="p-1.5 text-success-600 hover:bg-success-50 rounded transition-colors"
                       title="出库"
+                      @click="openOutboundModal(batch.id)"
                     >
                       <ArrowDownCircle class="w-4 h-4" />
                     </button>
@@ -456,42 +487,50 @@ onMounted(() => {
           </table>
         </div>
         
-        <div v-if="data?.list.length === 0" class="p-16 text-center">
+        <div
+          v-if="data?.list.length === 0"
+          class="p-16 text-center"
+        >
           <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
             <Package class="w-8 h-8 text-gray-300" />
           </div>
-          <p class="text-gray-400">暂无批次数据</p>
+          <p class="text-gray-400">
+            暂无批次数据
+          </p>
         </div>
         
-        <div v-if="data && data.total > 0" class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <div
+          v-if="data && data.total > 0"
+          class="px-6 py-4 border-t border-gray-100 flex items-center justify-between"
+        >
           <div class="text-sm text-gray-500">
             共 {{ data.total }} 条记录，第 {{ pagination.page }} / {{ totalPages }} 页
           </div>
           <div class="flex items-center gap-2">
             <button
-              @click="handlePageChange(pagination.page - 1)"
               :disabled="pagination.page <= 1"
               class="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              @click="handlePageChange(pagination.page - 1)"
             >
               <ChevronLeft class="w-4 h-4" />
             </button>
             <button
               v-for="p in Math.min(5, totalPages)"
               :key="p"
-              @click="handlePageChange(p + Math.max(0, pagination.page - 3))"
               class="min-w-9 h-9 px-3 rounded-lg text-sm transition-colors"
               :class="[
                 pagination.page === p + Math.max(0, pagination.page - 3)
                   ? 'bg-primary-600 text-white'
                   : 'border border-gray-200 hover:bg-gray-50 text-gray-600',
               ]"
+              @click="handlePageChange(p + Math.max(0, pagination.page - 3))"
             >
               {{ p + Math.max(0, pagination.page - 3) }}
             </button>
             <button
-              @click="handlePageChange(pagination.page + 1)"
               :disabled="pagination.page >= totalPages"
               class="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              @click="handlePageChange(pagination.page + 1)"
             >
               <ChevronRight class="w-4 h-4" />
             </button>
@@ -507,10 +546,12 @@ onMounted(() => {
     >
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 class="text-lg font-semibold text-gray-800">录入新批次</h3>
+          <h3 class="text-lg font-semibold text-gray-800">
+            录入新批次
+          </h3>
           <button
-            @click="showCreateModal = false"
             class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="showCreateModal = false"
           >
             <X class="w-5 h-5 text-gray-400" />
           </button>
@@ -525,8 +566,14 @@ onMounted(() => {
               v-model="createForm.reagentId"
               class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
             >
-              <option value="">请选择试剂</option>
-              <option v-for="r in reagents" :key="r.id" :value="r.id">
+              <option value="">
+                请选择试剂
+              </option>
+              <option
+                v-for="r in reagents"
+                :key="r.id"
+                :value="r.id"
+              >
                 {{ r.name }} ({{ r.specification }})
               </option>
             </select>
@@ -541,7 +588,7 @@ onMounted(() => {
               type="text"
               class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all font-mono"
               placeholder="如：BSA20250101"
-            />
+            >
           </div>
           
           <div class="grid grid-cols-2 gap-4">
@@ -553,7 +600,7 @@ onMounted(() => {
                 v-model="createForm.productionDate"
                 type="date"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              />
+              >
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -563,7 +610,7 @@ onMounted(() => {
                 v-model="createForm.expiryDate"
                 type="date"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              />
+              >
             </div>
           </div>
           
@@ -579,7 +626,7 @@ onMounted(() => {
                 step="0.01"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                 placeholder="0"
-              />
+              >
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -589,7 +636,7 @@ onMounted(() => {
                 v-model="createForm.receivedDate"
                 type="date"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              />
+              >
             </div>
           </div>
           
@@ -602,7 +649,7 @@ onMounted(() => {
               type="text"
               class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
               placeholder="如：A-01-03"
-            />
+            >
           </div>
           
           <div>
@@ -614,23 +661,26 @@ onMounted(() => {
               rows="2"
               class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
               placeholder="可选备注信息"
-            ></textarea>
+            />
           </div>
         </div>
         
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
-            @click="showCreateModal = false"
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
+            @click="showCreateModal = false"
           >
             取消
           </button>
           <button
-            @click="handleCreateSubmit"
             :disabled="createLoading"
             class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all disabled:opacity-70 flex items-center gap-2"
+            @click="handleCreateSubmit"
           >
-            <span v-if="createLoading" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+            <span
+              v-if="createLoading"
+              class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+            />
             确认录入
           </button>
         </div>
@@ -645,31 +695,49 @@ onMounted(() => {
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div>
-            <h3 class="text-lg font-semibold text-gray-800">批次详情</h3>
-            <p class="text-sm text-gray-500 mt-0.5 font-mono">{{ currentBatch?.batchNumber }}</p>
+            <h3 class="text-lg font-semibold text-gray-800">
+              批次详情
+            </h3>
+            <p class="text-sm text-gray-500 mt-0.5 font-mono">
+              {{ currentBatch?.batchNumber }}
+            </p>
           </div>
           <button
-            @click="showDetailModal = false"
             class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="showDetailModal = false"
           >
             <X class="w-5 h-5 text-gray-400" />
           </button>
         </div>
         
-        <div v-if="detailLoading" class="flex-1 p-12 flex items-center justify-center">
-          <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+        <div
+          v-if="detailLoading"
+          class="flex-1 p-12 flex items-center justify-center"
+        >
+          <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
         </div>
         
-        <div v-else-if="currentBatch" class="flex-1 overflow-y-auto">
+        <div
+          v-else-if="currentBatch"
+          class="flex-1 overflow-y-auto"
+        >
           <div class="p-6 space-y-6">
             <div class="grid grid-cols-2 gap-4">
               <div class="p-4 bg-gray-50 rounded-xl">
-                <div class="text-xs text-gray-500 mb-1">试剂名称</div>
-                <div class="font-semibold text-gray-800">{{ currentBatch.reagentName }}</div>
+                <div class="text-xs text-gray-500 mb-1">
+                  试剂名称
+                </div>
+                <div class="font-semibold text-gray-800">
+                  {{ currentBatch.reagentName }}
+                </div>
               </div>
               <div class="p-4 bg-gray-50 rounded-xl">
-                <div class="text-xs text-gray-500 mb-1">批次号</div>
-                <div class="font-semibold text-gray-800 font-mono">{{ currentBatch.batchNumber }}</div>
+                <div class="text-xs text-gray-500 mb-1">
+                  批次号
+                </div>
+                <div class="font-semibold text-gray-800 font-mono">
+                  {{ currentBatch.batchNumber }}
+                </div>
               </div>
             </div>
             
@@ -679,17 +747,28 @@ onMounted(() => {
                   <Calendar class="w-3 h-3" />
                   生产日期
                 </div>
-                <div class="font-medium text-gray-800">{{ formatDate(currentBatch.productionDate) }}</div>
+                <div class="font-medium text-gray-800">
+                  {{ formatDate(currentBatch.productionDate) }}
+                </div>
               </div>
-              <div class="p-4 rounded-xl" :class="currentBatch.status === 'expired' ? 'bg-danger-50' : currentBatch.status === 'warning' ? 'bg-warning-50' : 'bg-gray-50'">
+              <div
+                class="p-4 rounded-xl"
+                :class="currentBatch.status === 'expired' ? 'bg-danger-50' : currentBatch.status === 'warning' ? 'bg-warning-50' : 'bg-gray-50'"
+              >
                 <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
                   <Clock class="w-3 h-3" />
                   有效期至
                 </div>
-                <div class="font-medium" :class="currentBatch.status === 'expired' ? 'text-danger-600' : currentBatch.status === 'warning' ? 'text-warning-600' : 'text-gray-800'">
+                <div
+                  class="font-medium"
+                  :class="currentBatch.status === 'expired' ? 'text-danger-600' : currentBatch.status === 'warning' ? 'text-warning-600' : 'text-gray-800'"
+                >
                   {{ formatDate(currentBatch.expiryDate) }}
                 </div>
-                <div class="text-xs mt-0.5" :class="currentBatch.status === 'expired' ? 'text-danger-500' : currentBatch.status === 'warning' ? 'text-warning-500' : 'text-gray-400'">
+                <div
+                  class="text-xs mt-0.5"
+                  :class="currentBatch.status === 'expired' ? 'text-danger-500' : currentBatch.status === 'warning' ? 'text-warning-500' : 'text-gray-400'"
+                >
                   {{ getDaysLabel(currentBatch) }}
                 </div>
               </div>
@@ -698,7 +777,9 @@ onMounted(() => {
                   <MapPin class="w-3 h-3" />
                   存放位置
                 </div>
-                <div class="font-medium text-gray-800">{{ currentBatch.storageLocation }}</div>
+                <div class="font-medium text-gray-800">
+                  {{ currentBatch.storageLocation }}
+                </div>
               </div>
             </div>
             
@@ -725,7 +806,7 @@ onMounted(() => {
                     'bg-danger-500': 100 - getUsagePercentage(currentBatch) <= 20,
                   }"
                   :style="{ width: `${100 - getUsagePercentage(currentBatch)}%` }"
-                ></div>
+                />
               </div>
               <div class="flex justify-between mt-2 text-xs text-gray-500">
                 <span>已使用 {{ getUsagePercentage(currentBatch).toFixed(1) }}%</span>
@@ -733,21 +814,28 @@ onMounted(() => {
               </div>
             </div>
             
-            <div v-if="currentBatch.remark" class="p-4 bg-gray-50 rounded-xl">
+            <div
+              v-if="currentBatch.remark"
+              class="p-4 bg-gray-50 rounded-xl"
+            >
               <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
                 <FileText class="w-3 h-3" />
                 备注
               </div>
-              <div class="text-gray-700 text-sm">{{ currentBatch.remark }}</div>
+              <div class="text-gray-700 text-sm">
+                {{ currentBatch.remark }}
+              </div>
             </div>
             
             <div>
               <div class="flex items-center justify-between mb-4">
-                <h4 class="font-semibold text-gray-800">出入库记录</h4>
+                <h4 class="font-semibold text-gray-800">
+                  出入库记录
+                </h4>
                 <button
                   v-if="currentBatch.status !== 'expired' && currentBatch.status !== 'exhausted'"
-                  @click="openOutboundModal(currentBatch.id)"
                   class="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                  @click="openOutboundModal(currentBatch.id)"
                 >
                   <ArrowDownCircle class="w-4 h-4" />
                   出库
@@ -755,7 +843,7 @@ onMounted(() => {
               </div>
               
               <div class="relative">
-                <div class="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200"></div>
+                <div class="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200" />
                 
                 <div class="space-y-4">
                   <div
@@ -767,8 +855,14 @@ onMounted(() => {
                       class="absolute left-2 top-1 w-5 h-5 rounded-full border-2 border-white shadow flex items-center justify-center"
                       :class="op.type === 'in' ? 'bg-success-500' : 'bg-primary-500'"
                     >
-                      <ArrowUpCircle v-if="op.type === 'in'" class="w-3 h-3 text-white" />
-                      <ArrowDownCircle v-else class="w-3 h-3 text-white" />
+                      <ArrowUpCircle
+                        v-if="op.type === 'in'"
+                        class="w-3 h-3 text-white"
+                      />
+                      <ArrowDownCircle
+                        v-else
+                        class="w-3 h-3 text-white"
+                      />
                     </div>
                     
                     <div class="bg-gray-50 rounded-lg p-3">
@@ -797,7 +891,10 @@ onMounted(() => {
                   </div>
                 </div>
                 
-                <div v-if="currentBatch.operations.length === 0" class="text-center py-8 text-gray-400 text-sm">
+                <div
+                  v-if="currentBatch.operations.length === 0"
+                  class="text-center py-8 text-gray-400 text-sm"
+                >
                   暂无出入库记录
                 </div>
               </div>
@@ -807,8 +904,8 @@ onMounted(() => {
         
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 flex-shrink-0">
           <button
-            @click="showDetailModal = false"
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
+            @click="showDetailModal = false"
           >
             关闭
           </button>
@@ -823,10 +920,12 @@ onMounted(() => {
     >
       <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h3 class="text-lg font-semibold text-gray-800">批次出库</h3>
+          <h3 class="text-lg font-semibold text-gray-800">
+            批次出库
+          </h3>
           <button
-            @click="showOutboundModal = false"
             class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="showOutboundModal = false"
           >
             <X class="w-5 h-5 text-gray-400" />
           </button>
@@ -844,7 +943,7 @@ onMounted(() => {
               step="0.01"
               class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
               placeholder="请输入出库数量"
-            />
+            >
           </div>
           
           <div>
@@ -856,23 +955,26 @@ onMounted(() => {
               rows="3"
               class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
               placeholder="请输入实验用途"
-            ></textarea>
+            />
           </div>
         </div>
         
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
-            @click="showOutboundModal = false"
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
+            @click="showOutboundModal = false"
           >
             取消
           </button>
           <button
-            @click="handleOutboundSubmit"
             :disabled="outboundLoading"
             class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all disabled:opacity-70 flex items-center gap-2"
+            @click="handleOutboundSubmit"
           >
-            <span v-if="outboundLoading" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+            <span
+              v-if="outboundLoading"
+              class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+            />
             确认出库
           </button>
         </div>

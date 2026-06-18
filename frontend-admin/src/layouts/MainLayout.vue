@@ -18,7 +18,10 @@ onMounted(() => {
 
 <template>
   <div class="min-h-screen bg-neutral-50">
-    <Sidebar :collapsed="sidebarCollapsed" @toggle="toggleSidebar" />
+    <Sidebar
+      :collapsed="sidebarCollapsed"
+      @toggle="toggleSidebar"
+    />
     
     <div
       class="transition-all duration-300 min-h-screen"
@@ -27,7 +30,10 @@ onMounted(() => {
       <Header />
       <main class="p-6">
         <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
+          <transition
+            name="fade"
+            mode="out-in"
+          >
             <component :is="Component" />
           </transition>
         </router-view>

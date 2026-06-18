@@ -72,18 +72,18 @@ const handleLogout = async () => {
           type="text"
           placeholder="搜索试剂、耗材..."
           class="w-64 pl-10 pr-4 py-2 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-        />
+        >
       </div>
 
       <button class="relative p-2 rounded-lg hover:bg-gray-100 transition-colors">
         <Bell class="w-5 h-5 text-gray-500" />
-        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
+        <span class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
       </button>
 
       <div class="relative">
         <button
-          @click="showUserMenu = !showUserMenu"
           class="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+          @click="showUserMenu = !showUserMenu"
         >
           <div class="w-8 h-8 rounded-full bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
             <User class="w-4 h-4 text-white" />
@@ -96,7 +96,10 @@ const handleLogout = async () => {
               {{ userStore.state.user?.role ? roleLabels[userStore.state.user.role] : '' }}
             </div>
           </div>
-          <ChevronDown class="w-4 h-4 text-gray-400" :class="{ 'rotate-180': showUserMenu }" />
+          <ChevronDown
+            class="w-4 h-4 text-gray-400"
+            :class="{ 'rotate-180': showUserMenu }"
+          />
         </button>
 
         <div
@@ -111,10 +114,10 @@ const handleLogout = async () => {
             <Settings class="w-4 h-4" />
             系统设置
           </button>
-          <div class="border-t border-gray-100 my-1"></div>
+          <div class="border-t border-gray-100 my-1" />
           <button
-            @click="handleLogout"
             class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+            @click="handleLogout"
           >
             <LogOut class="w-4 h-4" />
             退出登录

@@ -198,7 +198,7 @@ onMounted(() => {
               placeholder="搜索试剂名称、CAS号、生产厂家..."
               class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
               @keyup.enter="handleSearch"
-            />
+            >
           </div>
         </div>
         
@@ -206,29 +206,35 @@ onMounted(() => {
           v-model="searchForm.category"
           class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
         >
-          <option value="">全部分类</option>
-          <option v-for="cat in reagentCategories" :key="cat" :value="cat">
+          <option value="">
+            全部分类
+          </option>
+          <option
+            v-for="cat in reagentCategories"
+            :key="cat"
+            :value="cat"
+          >
             {{ cat }}
           </option>
         </select>
         
         <button
-          @click="handleSearch"
           class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
+          @click="handleSearch"
         >
           搜索
         </button>
         
         <button
-          @click="handleReset"
           class="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
+          @click="handleReset"
         >
           重置
         </button>
         
         <button
-          @click="openCreateModal"
           class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all flex items-center gap-2 shadow-md shadow-primary-500/20"
+          @click="openCreateModal"
         >
           <Plus class="w-4 h-4" />
           新增试剂
@@ -237,8 +243,11 @@ onMounted(() => {
     </div>
 
     <div class="bg-white rounded-xl shadow-card overflow-hidden">
-      <div v-if="loading" class="p-16 flex items-center justify-center">
-        <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full"></div>
+      <div
+        v-if="loading"
+        class="p-16 flex items-center justify-center"
+      >
+        <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
       </div>
       
       <div v-else>
@@ -284,7 +293,9 @@ onMounted(() => {
                       <FlaskConical class="w-5 h-5 text-primary-600" />
                     </div>
                     <div>
-                      <div class="font-medium text-gray-900">{{ reagent.name }}</div>
+                      <div class="font-medium text-gray-900">
+                        {{ reagent.name }}
+                      </div>
                       <div class="text-xs text-gray-400">
                         更新于 {{ formatDate(reagent.updatedAt, 'MM-DD') }}
                       </div>
@@ -313,7 +324,10 @@ onMounted(() => {
                   >
                     {{ hazardLevelLabels[reagent.hazardLevel] }}
                   </span>
-                  <span v-else class="text-gray-400 text-sm">-</span>
+                  <span
+                    v-else
+                    class="text-gray-400 text-sm"
+                  >-</span>
                 </td>
                 <td class="px-6 py-4 text-sm text-gray-600">
                   {{ reagent.manufacturer || '-' }}
@@ -321,23 +335,23 @@ onMounted(() => {
                 <td class="px-6 py-4">
                   <div class="flex items-center justify-center gap-2">
                     <button
-                      @click="goToBatches(reagent.id)"
                       class="p-1.5 text-primary-600 hover:bg-primary-50 rounded transition-colors"
                       title="查看批次"
+                      @click="goToBatches(reagent.id)"
                     >
                       <Eye class="w-4 h-4" />
                     </button>
                     <button
-                      @click="openEditModal(reagent.id)"
                       class="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                       title="编辑"
+                      @click="openEditModal(reagent.id)"
                     >
                       <Edit2 class="w-4 h-4" />
                     </button>
                     <button
-                      @click="handleDelete(reagent.id)"
                       class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                       title="删除"
+                      @click="handleDelete(reagent.id)"
                     >
                       <Trash2 class="w-4 h-4" />
                     </button>
@@ -348,42 +362,50 @@ onMounted(() => {
           </table>
         </div>
         
-        <div v-if="data?.list.length === 0" class="p-16 text-center">
+        <div
+          v-if="data?.list.length === 0"
+          class="p-16 text-center"
+        >
           <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
             <FlaskConical class="w-8 h-8 text-gray-300" />
           </div>
-          <p class="text-gray-400">暂无试剂数据</p>
+          <p class="text-gray-400">
+            暂无试剂数据
+          </p>
         </div>
         
-        <div v-if="data && data.total > 0" class="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+        <div
+          v-if="data && data.total > 0"
+          class="px-6 py-4 border-t border-gray-100 flex items-center justify-between"
+        >
           <div class="text-sm text-gray-500">
             共 {{ data.total }} 条记录，第 {{ pagination.page }} / {{ totalPages }} 页
           </div>
           <div class="flex items-center gap-2">
             <button
-              @click="handlePageChange(pagination.page - 1)"
               :disabled="pagination.page <= 1"
               class="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              @click="handlePageChange(pagination.page - 1)"
             >
               <ChevronLeft class="w-4 h-4" />
             </button>
             <button
               v-for="p in Math.min(5, totalPages)"
               :key="p"
-              @click="handlePageChange(p + Math.max(0, pagination.page - 3))"
               class="min-w-9 h-9 px-3 rounded-lg text-sm transition-colors"
               :class="[
                 pagination.page === p + Math.max(0, pagination.page - 3)
                   ? 'bg-primary-600 text-white'
                   : 'border border-gray-200 hover:bg-gray-50 text-gray-600',
               ]"
+              @click="handlePageChange(p + Math.max(0, pagination.page - 3))"
             >
               {{ p + Math.max(0, pagination.page - 3) }}
             </button>
             <button
-              @click="handlePageChange(pagination.page + 1)"
               :disabled="pagination.page >= totalPages"
               class="p-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              @click="handlePageChange(pagination.page + 1)"
             >
               <ChevronRight class="w-4 h-4" />
             </button>
@@ -403,8 +425,8 @@ onMounted(() => {
             {{ formMode === 'create' ? '新增试剂' : '编辑试剂' }}
           </h3>
           <button
-            @click="showFormModal = false"
             class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="showFormModal = false"
           >
             <X class="w-5 h-5 text-gray-400" />
           </button>
@@ -421,7 +443,7 @@ onMounted(() => {
                 type="text"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                 placeholder="请输入试剂名称"
-              />
+              >
             </div>
             
             <div class="grid grid-cols-2 gap-4">
@@ -434,7 +456,7 @@ onMounted(() => {
                   type="text"
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                   placeholder="如：9048-46-8"
-                />
+                >
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -444,8 +466,14 @@ onMounted(() => {
                   v-model="formData.category"
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
                 >
-                  <option value="">请选择分类</option>
-                  <option v-for="cat in reagentCategories" :key="cat" :value="cat">
+                  <option value="">
+                    请选择分类
+                  </option>
+                  <option
+                    v-for="cat in reagentCategories"
+                    :key="cat"
+                    :value="cat"
+                  >
                     {{ cat }}
                   </option>
                 </select>
@@ -462,7 +490,7 @@ onMounted(() => {
                   type="text"
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                   placeholder="如：100mg/mL"
-                />
+                >
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -473,7 +501,7 @@ onMounted(() => {
                   type="text"
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                   placeholder="如：mL、g、瓶"
-                />
+                >
               </div>
             </div>
             
@@ -486,8 +514,14 @@ onMounted(() => {
                   v-model="formData.storageCondition"
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
                 >
-                  <option value="">请选择储存条件</option>
-                  <option v-for="sc in storageConditions" :key="sc" :value="sc">
+                  <option value="">
+                    请选择储存条件
+                  </option>
+                  <option
+                    v-for="sc in storageConditions"
+                    :key="sc"
+                    :value="sc"
+                  >
                     {{ sc }}
                   </option>
                 </select>
@@ -500,9 +534,15 @@ onMounted(() => {
                   v-model="formData.hazardLevel"
                   class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
                 >
-                  <option value="low">低危</option>
-                  <option value="medium">中危</option>
-                  <option value="high">高危</option>
+                  <option value="low">
+                    低危
+                  </option>
+                  <option value="medium">
+                    中危
+                  </option>
+                  <option value="high">
+                    高危
+                  </option>
                 </select>
               </div>
             </div>
@@ -516,7 +556,7 @@ onMounted(() => {
                 type="text"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
                 placeholder="请输入生产厂家"
-              />
+              >
             </div>
             
             <div>
@@ -528,24 +568,27 @@ onMounted(() => {
                 rows="3"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
                 placeholder="请输入试剂描述"
-              ></textarea>
+              />
             </div>
           </div>
         </div>
         
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
-            @click="showFormModal = false"
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
+            @click="showFormModal = false"
           >
             取消
           </button>
           <button
-            @click="handleSubmit"
             :disabled="formLoading"
             class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all disabled:opacity-70 flex items-center gap-2"
+            @click="handleSubmit"
           >
-            <span v-if="formLoading" class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></span>
+            <span
+              v-if="formLoading"
+              class="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"
+            />
             {{ formMode === 'create' ? '创建' : '保存' }}
           </button>
         </div>
