@@ -2,9 +2,9 @@ import QRCode from 'qrcode'
 import JsBarcode from 'jsbarcode'
 import type { LabelData, LabelEntityType } from '@/types/label'
 
-export function buildLabelCode(entityType: LabelEntityType, entityId: string, code?: string): string {
+export function buildLabelCode(entityType: LabelEntityType, entityId: string): string {
   const prefix = entityType === 'reagent' ? 'RGT' : entityType === 'batch' ? 'BCH' : 'CON'
-  return `${prefix}-${code || entityId}`
+  return `${prefix}-${entityId}`
 }
 
 export function parseLabelCode(rawCode: string): { entityType: LabelEntityType | null; entityId: string; code: string } {

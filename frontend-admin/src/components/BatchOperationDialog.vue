@@ -13,11 +13,15 @@ import {
   PackageOpen,
   ClipboardCheck,
   CalendarClock,
+  ScanLine,
 } from 'lucide-vue-next'
 import type { ReagentBatch, BatchOperationType, BatchOperationFormData } from '@/types/batch'
 import { operationTypeLabels, operationTypeConfigs } from '@/types/batch'
 import { mockBatchOperation } from '@/mock/batches'
 import { formatDate } from '@/utils/date'
+import ScanSearchBox from './ScanSearchBox.vue'
+import { parseLabelCode } from '@/utils/label'
+import type { LabelEntityType } from '@/types/label'
 
 const props = defineProps<{
   visible: boolean
@@ -28,6 +32,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   success: []
+  'scan-batch': [batchId: string]
 }>()
 
 const loading = ref(false)
@@ -84,6 +89,18 @@ watch(
 
 const close = () => {
   emit('update:visible', false)
+}
+
+const handleOperationScan = (payload: { entityType: LabelEntityType | null; entityId: string; code: string }) => {
+  if (!payload.entityType || !payload.entityId) {
+    alert('未识别到有效的批次标签')
+    return
+  }
+  if (payload.entityType !== 'batch') {
+    alert(`扫码识别为${payload.entityType === 'reagent' ? '试剂' : '耗材'}，请扫描批次标签`)
+    return
+  }
+  emit('scan-batch', payload.entityId)
 }
 
 const handleSubmit = async () => {
@@ -165,6 +182,20 @@ const handleSubmit = async () => {
       </div>
 
       <div class="p-6 space-y-4">
+        <div class="p-3 bg-primary-50 rounded-xl border border-primary-100">
+          <div class="text-xs text-primary-700 font-medium mb-2 flex items-center gap-1">
+            <ScanLine class="w-3.5 h-3.5" />
+            扫码切换操作批次（预留接入扫码枪）
+          </div>
+          <ScanSearchBox
+            placeholder="扫描批次标签或输入编号..."
+            @scan="handleOperationScan"
+          />
+          <p class="text-[11px] text-primary-600 mt-1.5">
+            支持的操作：调拨、盘盈、盘亏、冻结、解冻、报废、退库、入库等所有批次操作
+          </p>
+        </div>
+
         <div class="p-4 bg-gray-50 rounded-xl">
           <div class="text-xs text-gray-500 mb-1">当前批次</div>
           <div class="font-medium text-gray-800">{{ batch.reagentName }}</div>

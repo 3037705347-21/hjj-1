@@ -56,7 +56,7 @@ const entityTypeLabel = computed((): string => {
 
 const generateCodes = async () => {
   if (!props.labelData) return
-  fullCode.value = buildLabelCode(props.labelData.entityType, props.labelData.entityId, props.labelData.code)
+  fullCode.value = buildLabelCode(props.labelData.entityType, props.labelData.entityId)
   const qrSize = config.value.labelSize === '80x50' ? 180 : config.value.labelSize === '60x40' ? 140 : 100
   qrcodeDataUrl.value = await generateQRCodeDataURL(fullCode.value, qrSize)
   const bcWidth = config.value.labelSize === '80x50' ? 480 : config.value.labelSize === '60x40' ? 360 : 240

@@ -57,6 +57,7 @@ import type { BatchEditField } from '@/components/BatchEditDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import type {
   ReagentBatch,
+  BatchStatus,
   BatchOperation,
   BatchFormData,
   OutboundFormData,
@@ -73,6 +74,7 @@ import { storageConditions } from '@/types/reagent'
 import type { PageResult } from '@/types/common'
 import type { Reagent } from '@/types/reagent'
 import type { LabelData, LabelEntityType } from '@/types/label'
+import { parseLabelCode } from '@/utils/label'
 import { formatDate, getExpiryDays } from '@/utils/date'
 import BatchOperationDialog from '@/components/BatchOperationDialog.vue'
 import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
@@ -496,6 +498,18 @@ const openOutboundModal = (id: string) => {
   showOutboundModal.value = true
 }
 
+const handleOutboundScan = (payload: { entityType: LabelEntityType | null; entityId: string; code: string }) => {
+  if (!payload.entityType || !payload.entityId) {
+    alert('未识别到有效的批次标签')
+    return
+  }
+  if (payload.entityType !== 'batch') {
+    alert(`扫码识别为${payload.entityType === 'reagent' ? '试剂' : '耗材'}，请扫描批次标签`)
+    return
+  }
+  outboundBatchId.value = payload.entityId
+}
+
 const handleOutboundSubmit = async () => {
   if (outboundForm.quantity <= 0) {
     alert('出库数量必须大于0')
@@ -544,6 +558,23 @@ const openOperation = (batch: ReagentBatch, opType: BatchOperationType) => {
   currentOperationType.value = opType
   showOperationDialog.value = true
   openMoreMenuBatchId.value = null
+}
+
+const handleOperationScanBatch = async (batchId: string) => {
+  try {
+    const data = await mockGetBatch(batchId)
+    if (!data) {
+      alert('扫码未找到对应批次，请检查标签是否有效')
+      return
+    }
+    if (isOperationDisabled(data, currentOperationType.value as BatchOperationType)) {
+      alert(`当前批次状态「${batchStatusLabels[data.status as BatchStatus]}」不支持此操作`)
+      return
+    }
+    operationBatch.value = data
+  } catch (e: any) {
+    alert(e.message || '切换批次失败')
+  }
 }
 
 const handleOperationSuccess = () => {
@@ -1324,6 +1355,13 @@ onMounted(() => {
                 </h4>
                 <div class="flex items-center gap-2">
                   <button
+                    class="px-3 py-1.5 text-sm bg-white hover:bg-gray-50 text-primary-600 border border-primary-200 rounded-lg transition-colors flex items-center gap-1"
+                    @click="openPrintDialog(currentBatch)"
+                  >
+                    <Printer class="w-4 h-4" />
+                    打印标签
+                  </button>
+                  <button
                     v-if="
                       permission.canOutboundBatch &&
                       currentBatch.status !== 'expired' &&
@@ -1514,6 +1552,16 @@ onMounted(() => {
         </div>
 
         <div class="p-6 space-y-4">
+          <div class="p-3 bg-primary-50 rounded-xl border border-primary-100">
+            <div class="text-xs text-primary-700 font-medium mb-2 flex items-center gap-1">
+              <ScanLine class="w-3.5 h-3.5" />
+              扫码快速定位批次（预留接入扫码枪）
+            </div>
+            <ScanSearchBox
+              placeholder="扫描批次标签或输入编号..."
+              @scan="handleOutboundScan"
+            />
+          </div>
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               出库数量 <span class="text-red-500">*</span>
@@ -1568,6 +1616,7 @@ onMounted(() => {
       :batch="operationBatch"
       :operation-type="currentOperationType"
       @success="handleOperationSuccess"
+      @scan-batch="handleOperationScanBatch"
     />
 
     <BatchImportDialog
