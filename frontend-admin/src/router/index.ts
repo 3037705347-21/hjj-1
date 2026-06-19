@@ -6,6 +6,7 @@ import DashboardPage from '@/pages/DashboardPage.vue'
 import ReagentsPage from '@/pages/ReagentsPage.vue'
 import BatchesPage from '@/pages/BatchesPage.vue'
 import ConsumablesPage from '@/pages/ConsumablesPage.vue'
+import ConsumableDetailPage from '@/pages/ConsumableDetailPage.vue'
 import { getUserStore } from '@/stores/user'
 
 const routes: RouteRecordRaw[] = [
@@ -43,6 +44,12 @@ const routes: RouteRecordRaw[] = [
         name: 'consumables',
         component: ConsumablesPage,
         meta: { title: '耗材管理' },
+      },
+      {
+        path: 'consumables/:id',
+        name: 'consumable-detail',
+        component: ConsumableDetailPage,
+        meta: { title: '耗材详情' },
       },
     ],
   },
