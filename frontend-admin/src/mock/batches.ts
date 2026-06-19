@@ -15,7 +15,7 @@ import type { User } from '@/types/user'
 const BATCH_STORAGE_KEY = 'mock_batches'
 const OPERATION_STORAGE_KEY = 'mock_batch_operations'
 
-function getBatchesFromStorage(): ReagentBatch[] {
+export function getBatchesFromStorage(): ReagentBatch[] {
   const data = localStorage.getItem(BATCH_STORAGE_KEY)
   if (data) {
     try {

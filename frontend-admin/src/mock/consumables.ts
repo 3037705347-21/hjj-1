@@ -14,7 +14,7 @@ import type { User } from '@/types/user'
 const STORAGE_KEY = 'mock_consumables'
 const OPERATION_STORAGE_KEY = 'mock_consumable_operations'
 
-function getConsumablesFromStorage(): Consumable[] {
+export function getConsumablesFromStorage(): Consumable[] {
   const data = localStorage.getItem(STORAGE_KEY)
   if (data) {
     try {
@@ -30,7 +30,7 @@ function saveConsumablesToStorage(consumables: Consumable[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(consumables))
 }
 
-function getOperationsFromStorage(): ConsumableOperation[] {
+export function getOperationsFromStorage(): ConsumableOperation[] {
   const data = localStorage.getItem(OPERATION_STORAGE_KEY)
   if (data) {
     try {

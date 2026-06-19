@@ -9,6 +9,7 @@ import {
   LogOut,
   Menu,
   X,
+  AlertTriangle,
 } from 'lucide-vue-next'
 import { getUserStore } from '@/stores/user'
 import { roleLabels } from '@/types/user'
@@ -30,6 +31,7 @@ const menuItems = [
   { path: '/reagents', name: '试剂管理', icon: FlaskConical },
   { path: '/batches', name: '试剂批管理', icon: TestTube },
   { path: '/consumables', name: '耗材管理', icon: PackageOpen },
+  { path: '/alerts', name: '预警中心', icon: AlertTriangle },
 ]
 
 const isActive = (path: string) => {
