@@ -1045,18 +1045,6 @@ export function downloadConsumableTemplate(): void {
   URL.revokeObjectURL(url)
 }
 
-export interface ConsumableFilterParams {
-  keyword?: string
-  category?: string
-  location?: string
-  manufacturer?: string
-  stockStatus?: string
-  createTimeStart?: string
-  createTimeEnd?: string
-  updateTimeStart?: string
-  updateTimeEnd?: string
-}
-
 export async function mockExportAllConsumables(filters?: ConsumableFilterParams): Promise<Consumable[]> {
   return new Promise((resolve) => {
     setTimeout(() => {

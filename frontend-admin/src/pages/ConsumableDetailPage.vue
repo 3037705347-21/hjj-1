@@ -21,6 +21,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Edit2,
+  Printer,
 } from 'lucide-vue-next'
 import type {
   Consumable,
@@ -36,6 +37,8 @@ import {
 import { mockGetConsumableDetail } from '@/mock/consumables'
 import { formatDate } from '@/utils/date'
 import ConsumableOperationModal from '@/components/ConsumableOperationModal.vue'
+import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
+import type { LabelData } from '@/types/label'
 
 const route = useRoute()
 const router = useRouter()
@@ -132,6 +135,25 @@ const getOperationConfig = (type: ConsumableOperationType) => {
   return operationTypeConfigs.find((c) => c.type === type)
 }
 
+const showPrintDialog = ref(false)
+const printLabelData = ref<LabelData | null>(null)
+
+const openPrintDialog = () => {
+  if (!consumable.value) return
+  printLabelData.value = {
+    entityType: 'consumable',
+    entityId: consumable.value.id,
+    code: consumable.value.id,
+    name: consumable.value.name,
+    specification: consumable.value.specification,
+    location: consumable.value.location,
+    manufacturer: consumable.value.manufacturer,
+    unit: consumable.value.unit,
+    quantity: consumable.value.stockQuantity,
+  }
+  showPrintDialog.value = true
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -152,6 +174,13 @@ onMounted(() => {
           <p class="text-sm text-gray-500 mt-0.5">查看耗材库存信息与出入库记录</p>
         </div>
       </div>
+      <button
+        class="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-medium text-sm shadow-sm transition-colors"
+        @click="openPrintDialog"
+      >
+        <Printer class="w-4 h-4" />
+        打印标签
+      </button>
     </div>
 
     <div v-if="loading" class="p-16 flex items-center justify-center bg-white rounded-xl shadow-card">
@@ -543,6 +572,12 @@ onMounted(() => {
       :consumable="consumable"
       :operation-type="currentOperationType"
       @success="handleOperationSuccess"
+    />
+
+    <LabelPrintDialog
+      :visible="showPrintDialog"
+      :label-data="printLabelData"
+      @close="showPrintDialog = false"
     />
   </div>
 </template>

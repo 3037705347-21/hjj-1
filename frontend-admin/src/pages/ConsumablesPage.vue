@@ -11,7 +11,6 @@ import {
   AlertTriangle,
   ChevronLeft,
   ChevronRight,
-  MapPin,
   Eye,
   PackagePlus,
   UserCheck,
@@ -23,6 +22,10 @@ import {
   Calendar,
   History,
   Boxes,
+  Printer,
+  ScanLine,
+  Tags,
+  MapPin,
 } from 'lucide-vue-next'
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
@@ -49,10 +52,6 @@ import BatchImportDialog from '@/components/BatchImportDialog.vue'
 import BatchEditDialog from '@/components/BatchEditDialog.vue'
 import type { BatchEditField } from '@/components/BatchEditDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import {
-  Tags,
-  MapPin,
-} from 'lucide-vue-next'
 import type {
   Consumable,
   ConsumableFormData,
@@ -68,6 +67,10 @@ import {
 import type { PageResult } from '@/types/common'
 import { formatDate } from '@/utils/date'
 import ConsumableOperationModal from '@/components/ConsumableOperationModal.vue'
+import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
+import ScanSearchBox from '@/components/ScanSearchBox.vue'
+import ScanResultCard from '@/components/ScanResultCard.vue'
+import type { LabelData, LabelEntityType } from '@/types/label'
 import { usePermission } from '@/composables/usePermission'
 
 const router = useRouter()
@@ -158,9 +161,9 @@ const batchEditFields = ref<BatchEditField[]>([])
 const batchEditLoading = ref(false)
 
 const batchActions = computed(() => [
-  { key: 'category', label: '批量修改分类', icon: Tags, type: 'default', permission: permission.canEditConsumable },
-  { key: 'location', label: '批量修改库位', icon: MapPin, type: 'default', permission: permission.canEditConsumable },
-  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger', permission: permission.canDeleteConsumable },
+  { key: 'category', label: '批量修改分类', icon: Tags, type: 'default' as const, permission: permission.canEditConsumable.value },
+  { key: 'location', label: '批量修改库位', icon: MapPin, type: 'default' as const, permission: permission.canEditConsumable.value },
+  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger' as const, permission: permission.canDeleteConsumable.value },
 ])
 
 const fetchData = async () => {
@@ -238,27 +241,6 @@ const handleDeleteFilter = (id: string) => {
   if (confirm('确定要删除该筛选条件吗？')) {
     deleteFilter(id)
   }
-}
-
-const handleExport = () => {
-  if (!data.value?.list.length) {
-    alert('暂无数据可导出')
-    return
-  }
-  const columns = [
-    { key: 'name', label: '耗材名称' },
-    { key: 'category', label: '分类' },
-    { key: 'specification', label: '规格' },
-    { key: 'unit', label: '单位' },
-    { key: 'stockQuantity', label: '当前库存' },
-    { key: 'safetyStock', label: '安全库存' },
-    { key: 'manufacturer', label: '生产厂家' },
-    { key: 'location', label: '库位' },
-    { key: 'description', label: '描述' },
-    { key: 'createdAt', label: '创建时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
-    { key: 'updatedAt', label: '更新时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
-  ]
-  exportToCsv(data.value.list, columns, `耗材列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
 }
 
 const handleAction = () => {
@@ -562,6 +544,39 @@ const handleOperationSuccess = () => {
   }
 }
 
+const showPrintDialog = ref(false)
+const printLabelData = ref<LabelData | null>(null)
+const showScanResult = ref(false)
+const scanEntityType = ref<LabelEntityType | null>(null)
+const scanEntityId = ref<string | null>(null)
+const scannedCode = ref<string | null>(null)
+
+const openPrintDialog = (consumable: Consumable) => {
+  printLabelData.value = {
+    entityType: 'consumable',
+    entityId: consumable.id,
+    code: consumable.id,
+    name: consumable.name,
+    specification: consumable.specification,
+    location: consumable.location,
+    manufacturer: consumable.manufacturer,
+    unit: consumable.unit,
+    quantity: consumable.stockQuantity,
+  }
+  showPrintDialog.value = true
+}
+
+const handleScan = (payload: { entityType: LabelEntityType | null; entityId: string; code: string }) => {
+  if (payload.entityType === 'consumable' && payload.entityId) {
+    router.push({ name: 'consumable-detail', params: { id: payload.entityId } })
+    return
+  }
+  scannedCode.value = payload.code
+  scanEntityType.value = payload.entityType
+  scanEntityId.value = payload.entityId
+  showScanResult.value = true
+}
+
 onMounted(() => {
   fetchData()
 })
@@ -625,15 +640,24 @@ onMounted(() => {
           @delete-filter="handleDeleteFilter"
         />
 
+        <div class="flex items-center gap-3 mb-2">
+          <div class="flex-1 max-w-md">
+            <ScanSearchBox
+              placeholder="扫码或输入耗材编号..."
+              @scan="handleScan"
+            />
+          </div>
+        </div>
+
         <BatchOperationBar
           :selected-count="selectedIds.length"
           :total-count="data?.total || 0"
           :actions="batchActions"
-          :show-import="permission.canCreateConsumable"
-          :show-export="permission.canViewConsumable"
-          :show-template="permission.canCreateConsumable"
-          :import-permission="permission.canCreateConsumable"
-          :export-permission="permission.canViewConsumable"
+          :show-import="permission.canCreateConsumable.value"
+          :show-export="permission.canViewConsumables.value"
+          :show-template="permission.canCreateConsumable.value"
+          :import-permission="permission.canCreateConsumable.value"
+          :export-permission="permission.canViewConsumables.value"
           class="mb-6"
           @action="handleBatchAction"
           @import="showImportDialog = true; importResult = null"
@@ -786,6 +810,14 @@ onMounted(() => {
                         @click="goToDetail(item.id)"
                       >
                         <Eye class="w-4 h-4" />
+                      </button>
+
+                      <button
+                        class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                        title="打印标签"
+                        @click="openPrintDialog(item)"
+                      >
+                        <Printer class="w-4 h-4" />
                       </button>
 
                       <div v-if="permission.canOperateConsumable || permission.canUseConsumable" class="relative group">
@@ -1267,6 +1299,19 @@ onMounted(() => {
       confirm-text="确认删除"
       type="danger"
       @confirm="handleBatchDelete"
+    />
+
+    <LabelPrintDialog
+      :visible="showPrintDialog"
+      :label-data="printLabelData"
+      @close="showPrintDialog = false"
+    />
+    <ScanResultCard
+      :visible="showScanResult"
+      :scanned-code="scannedCode"
+      :default-entity-type="scanEntityType"
+      :default-entity-id="scanEntityId"
+      @close="showScanResult = false"
     />
   </div>
 </template>

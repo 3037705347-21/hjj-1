@@ -19,6 +19,11 @@ import {
   ToggleLeft,
   ToggleRight,
   Download,
+  Printer,
+  ScanLine,
+  Tags,
+  Thermometer,
+  Power,
 } from 'lucide-vue-next'
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
@@ -45,12 +50,6 @@ import BatchImportDialog from '@/components/BatchImportDialog.vue'
 import BatchEditDialog from '@/components/BatchEditDialog.vue'
 import type { BatchEditField } from '@/components/BatchEditDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import {
-  Trash2,
-  Tags,
-  Thermometer,
-  Power,
-} from 'lucide-vue-next'
 import type { Reagent, ReagentFormData, Attachment } from '@/types/reagent'
 import type { PageResult } from '@/types/common'
 import {
@@ -65,6 +64,10 @@ import {
 } from '@/types/reagent'
 import { formatDate } from '@/utils/date'
 import { usePermission } from '@/composables/usePermission'
+import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
+import ScanSearchBox from '@/components/ScanSearchBox.vue'
+import ScanResultCard from '@/components/ScanResultCard.vue'
+import type { LabelData, LabelEntityType } from '@/types/label'
 
 const router = useRouter()
 const loading = ref(false)
@@ -131,12 +134,19 @@ const batchEditType = ref<'category' | 'storage' | 'status'>('category')
 const batchEditFields = ref<BatchEditField[]>([])
 const batchEditLoading = ref(false)
 
+const showPrintDialog = ref(false)
+const printLabelData = ref<LabelData | null>(null)
+const showScanResult = ref(false)
+const scanEntityType = ref<LabelEntityType | null>(null)
+const scanEntityId = ref<string | null>(null)
+const scannedCode = ref<string | null>(null)
+
 const batchActions = computed(() => [
-  { key: 'category', label: '批量修改分类', icon: Tags, type: 'default', permission: permission.canEditReagent },
-  { key: 'storage', label: '批量修改储存条件', icon: Thermometer, type: 'default', permission: permission.canEditReagent },
-  { key: 'enable', label: '批量启用', icon: Power, type: 'default', permission: permission.canEditReagent },
-  { key: 'disable', label: '批量停用', icon: Power, type: 'warning', permission: permission.canEditReagent },
-  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger', permission: permission.canDeleteReagent },
+  { key: 'category', label: '批量修改分类', icon: Tags, type: 'default' as const, permission: permission.canEditReagent.value },
+  { key: 'storage', label: '批量修改储存条件', icon: Thermometer, type: 'default' as const, permission: permission.canEditReagent.value },
+  { key: 'enable', label: '批量启用', icon: Power, type: 'default' as const, permission: permission.canEditReagent.value },
+  { key: 'disable', label: '批量停用', icon: Power, type: 'warning' as const, permission: permission.canEditReagent.value },
+  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger' as const, permission: permission.canDeleteReagent.value },
 ])
 
 const defaultFormData = (): ReagentFormData => ({
@@ -216,29 +226,6 @@ const handleDeleteFilter = (id: string) => {
   if (confirm('确定要删除该筛选条件吗？')) {
     deleteFilter(id)
   }
-}
-
-const handleExport = () => {
-  if (!data.value?.list.length) {
-    alert('暂无数据可导出')
-    return
-  }
-  const columns = [
-    { key: 'name', label: '试剂名称' },
-    { key: 'casNumber', label: 'CAS号' },
-    { key: 'category', label: '分类' },
-    { key: 'brand', label: '品牌' },
-    { key: 'catalogNumber', label: '货号' },
-    { key: 'manufacturer', label: '生产厂家' },
-    { key: 'specification', label: '规格' },
-    { key: 'unit', label: '单位' },
-    { key: 'storageCondition', label: '存储条件' },
-    { key: 'hazardLevel', label: '危险等级', formatter: (v: string) => hazardLevelLabels[v as keyof typeof hazardLevelLabels] || v },
-    { key: 'enabled', label: '状态', formatter: (v: boolean) => enabledStatusLabels[String(v) as 'true' | 'false'] },
-    { key: 'createdAt', label: '创建时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
-    { key: 'updatedAt', label: '更新时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
-  ]
-  exportToCsv(data.value.list, columns, `试剂列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
 }
 
 const handleAction = () => {
@@ -546,6 +533,27 @@ const goToBatches = (id: string) => {
   router.push(`/batches?reagentId=${id}`)
 }
 
+const openPrintDialog = (reagent: Reagent) => {
+  printLabelData.value = {
+    entityType: 'reagent',
+    entityId: reagent.id,
+    code: reagent.catalogNumber || reagent.id,
+    name: reagent.name,
+    specification: reagent.specification,
+    manufacturer: reagent.manufacturer,
+    unit: reagent.unit,
+    storageCondition: reagent.storageCondition,
+  }
+  showPrintDialog.value = true
+}
+
+const handleScan = (payload: { entityType: LabelEntityType | null; entityId: string; code: string }) => {
+  scannedCode.value = payload.code
+  scanEntityType.value = payload.entityType
+  scanEntityId.value = payload.entityId
+  showScanResult.value = true
+}
+
 const toggleExperimentType = (type: string) => {
   if (!formData.experimentTypes) {
     formData.experimentTypes = []
@@ -618,15 +626,24 @@ onMounted(() => {
       @delete-filter="handleDeleteFilter"
     />
 
+    <div class="flex items-center gap-3 mb-2">
+      <div class="flex-1 max-w-md">
+        <ScanSearchBox
+          placeholder="扫码或输入试剂编号..."
+          @scan="handleScan"
+        />
+      </div>
+    </div>
+
     <BatchOperationBar
       :selected-count="selectedIds.length"
       :total-count="data?.total || 0"
       :actions="batchActions"
-      :show-import="permission.canCreateReagent"
-      :show-export="permission.canViewReagent"
-      :show-template="permission.canCreateReagent"
-      :import-permission="permission.canCreateReagent"
-      :export-permission="permission.canViewReagent"
+      :show-import="permission.canCreateReagent.value"
+      :show-export="permission.canViewReagents.value"
+      :show-template="permission.canCreateReagent.value"
+      :import-permission="permission.canCreateReagent.value"
+      :export-permission="permission.canViewReagents.value"
       @action="handleBatchAction"
       @import="showImportDialog = true; importResult = null"
       @export="handleExport"
@@ -728,6 +745,13 @@ onMounted(() => {
                       @click="openDetailModal(reagent.id)"
                     >
                       <FileText class="w-4 h-4" />
+                    </button>
+                    <button
+                      class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                      title="打印标签"
+                      @click="openPrintDialog(reagent)"
+                    >
+                      <Printer class="w-4 h-4" />
                     </button>
                     <button
                       v-if="permission.canViewBatches"
@@ -1203,6 +1227,14 @@ onMounted(() => {
           </div>
           <div class="flex items-center gap-2">
             <button
+              v-if="detailData"
+              class="px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+              @click="openPrintDialog(detailData)"
+            >
+              <Printer class="w-4 h-4" />
+              打印标签
+            </button>
+            <button
               v-if="detailData && permission.canEditReagent"
               class="px-4 py-2 text-primary-600 hover:bg-primary-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
               @click="openEditModal(detailData.id); showDetailModal = false"
@@ -1437,6 +1469,19 @@ onMounted(() => {
       confirm-text="确认删除"
       type="danger"
       @confirm="handleBatchDelete"
+    />
+
+    <LabelPrintDialog
+      :visible="showPrintDialog"
+      :label-data="printLabelData"
+      @close="showPrintDialog = false"
+    />
+    <ScanResultCard
+      :visible="showScanResult"
+      :scanned-code="scannedCode"
+      :default-entity-type="scanEntityType"
+      :default-entity-id="scanEntityId"
+      @close="showScanResult = false"
     />
   </div>
 </template>

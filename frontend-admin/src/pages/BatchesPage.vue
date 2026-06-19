@@ -27,6 +27,8 @@ import {
   ClipboardCheck,
   CalendarClock,
   ChevronDown,
+  Printer,
+  ScanLine,
 } from 'lucide-vue-next'
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
@@ -53,12 +55,6 @@ import BatchImportDialog from '@/components/BatchImportDialog.vue'
 import BatchEditDialog from '@/components/BatchEditDialog.vue'
 import type { BatchEditField } from '@/components/BatchEditDialog.vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import {
-  Trash2,
-  MapPin,
-  Snowflake,
-  Sun,
-} from 'lucide-vue-next'
 import type {
   ReagentBatch,
   BatchOperation,
@@ -76,8 +72,12 @@ import {
 import { storageConditions } from '@/types/reagent'
 import type { PageResult } from '@/types/common'
 import type { Reagent } from '@/types/reagent'
+import type { LabelData, LabelEntityType } from '@/types/label'
 import { formatDate, getExpiryDays } from '@/utils/date'
 import BatchOperationDialog from '@/components/BatchOperationDialog.vue'
+import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
+import ScanSearchBox from '@/components/ScanSearchBox.vue'
+import ScanResultCard from '@/components/ScanResultCard.vue'
 
 const route = useRoute()
 const permission = usePermission()
@@ -176,11 +176,18 @@ const batchEditType = ref<'location'>('location')
 const batchEditFields = ref<BatchEditField[]>([])
 const batchEditLoading = ref(false)
 
+const showPrintDialog = ref(false)
+const printLabelData = ref<LabelData | null>(null)
+const showScanResult = ref(false)
+const scanEntityType = ref<LabelEntityType | null>(null)
+const scanEntityId = ref<string | null>(null)
+const scannedCode = ref<string | null>(null)
+
 const batchActions = computed(() => [
-  { key: 'location', label: '批量修改库位', icon: MapPin, type: 'default', permission: permission.canEditBatch },
-  { key: 'freeze', label: '批量冻结', icon: Snowflake, type: 'default', permission: permission.canEditBatch },
-  { key: 'unfreeze', label: '批量解冻', icon: Sun, type: 'default', permission: permission.canEditBatch },
-  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger', permission: permission.canDeleteBatch },
+  { key: 'location', label: '批量修改库位', icon: MapPin, type: 'default' as const, permission: permission.canOperateBatch.value },
+  { key: 'freeze', label: '批量冻结', icon: Snowflake, type: 'default' as const, permission: permission.canOperateBatch.value },
+  { key: 'unfreeze', label: '批量解冻', icon: Sun, type: 'default' as const, permission: permission.canOperateBatch.value },
+  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger' as const, permission: permission.canDeleteBatch.value },
 ])
 
 const fetchData = async () => {
@@ -237,27 +244,6 @@ const handleDeleteFilter = (id: string) => {
   if (confirm('确定要删除该筛选条件吗？')) {
     deleteFilter(id)
   }
-}
-
-const handleExport = () => {
-  if (!data.value?.list.length) {
-    alert('暂无数据可导出')
-    return
-  }
-  const columns = [
-    { key: 'batchNumber', label: '批次号' },
-    { key: 'reagentName', label: '试剂名称' },
-    { key: 'status', label: '状态', formatter: (v: string) => batchStatusLabels[v as keyof typeof batchStatusLabels] || v },
-    { key: 'currentQuantity', label: '当前数量' },
-    { key: 'initialQuantity', label: '初始数量' },
-    { key: 'productionDate', label: '生产日期' },
-    { key: 'expiryDate', label: '有效期' },
-    { key: 'receivedDate', label: '入库日期' },
-    { key: 'storageLocation', label: '库位' },
-    { key: 'operator', label: '操作人' },
-    { key: 'remark', label: '备注' },
-  ]
-  exportToCsv(data.value.list, columns, `批次列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
 }
 
 const handleAction = () => {
@@ -589,6 +575,29 @@ const filterByReagent = (reagentId: string) => {
   fetchData()
 }
 
+const openPrintDialog = (batch: ReagentBatch) => {
+  printLabelData.value = {
+    entityType: 'batch',
+    entityId: batch.id,
+    code: batch.batchNumber,
+    name: batch.reagentName || '',
+    batchNumber: batch.batchNumber,
+    specification: '',
+    expiryDate: batch.expiryDate,
+    location: batch.storageLocation,
+    unit: batch.unit,
+    quantity: batch.remainingQuantity,
+  }
+  showPrintDialog.value = true
+}
+
+const handleScan = (payload: { entityType: LabelEntityType | null; entityId: string; code: string }) => {
+  scannedCode.value = payload.code
+  scanEntityType.value = payload.entityType
+  scanEntityId.value = payload.entityId
+  showScanResult.value = true
+}
+
 const getOperationIconComponent = (iconName: string) => {
   const map: Record<string, any> = {
     ArrowUpCircle,
@@ -660,15 +669,24 @@ onMounted(() => {
       @delete-filter="handleDeleteFilter"
     />
 
+    <div class="flex items-center gap-3 mb-2">
+      <div class="flex-1 max-w-md">
+        <ScanSearchBox
+          placeholder="扫码或输入批次号..."
+          @scan="handleScan"
+        />
+      </div>
+    </div>
+
     <BatchOperationBar
       :selected-count="selectedIds.length"
       :total-count="data?.total || 0"
       :actions="batchActions"
-      :show-import="permission.canCreateBatch"
-      :show-export="permission.canViewBatch"
-      :show-template="permission.canCreateBatch"
-      :import-permission="permission.canCreateBatch"
-      :export-permission="permission.canViewBatch"
+      :show-import="permission.canCreateBatch.value"
+      :show-export="permission.canViewBatches.value"
+      :show-template="permission.canCreateBatch.value"
+      :import-permission="permission.canCreateBatch.value"
+      :export-permission="permission.canViewBatches.value"
       @action="handleBatchAction"
       @import="showImportDialog = true; importResult = null"
       @export="handleExport"
@@ -839,6 +857,13 @@ onMounted(() => {
                       @click="openDetailModal(batch.id)"
                     >
                       <Eye class="w-4 h-4" />
+                    </button>
+                    <button
+                      class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded transition-colors"
+                      title="打印标签"
+                      @click="openPrintDialog(batch)"
+                    >
+                      <Printer class="w-4 h-4" />
                     </button>
                     <button
                       v-if="permission.canOutboundBatch && batch.status !== 'expired' && batch.status !== 'exhausted' && batch.status !== 'frozen'"
@@ -1571,6 +1596,19 @@ onMounted(() => {
       confirm-text="确认删除"
       type="danger"
       @confirm="handleBatchDelete"
+    />
+
+    <LabelPrintDialog
+      :visible="showPrintDialog"
+      :label-data="printLabelData"
+      @close="showPrintDialog = false"
+    />
+    <ScanResultCard
+      :visible="showScanResult"
+      :scanned-code="scannedCode"
+      :default-entity-type="scanEntityType"
+      :default-entity-id="scanEntityId"
+      @close="showScanResult = false"
     />
   </div>
 </template>
