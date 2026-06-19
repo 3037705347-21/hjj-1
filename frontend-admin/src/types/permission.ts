@@ -28,6 +28,10 @@ export type PermissionCode =
   | 'alert:rule:manage'
   | 'audit:view'
   | 'audit:export'
+  | 'approval:view'
+  | 'approval:submit'
+  | 'approval:handle'
+  | 'approval:approve'
 
 export type DataScope = 'all' | 'lab' | 'department' | 'group' | 'self'
 
@@ -65,6 +69,10 @@ export const permissionLabels: Record<PermissionCode, string> = {
   'alert:rule:manage': '管理预警规则',
   'audit:view': '查看审计日志',
   'audit:export': '导出审计日志',
+  'approval:view': '查看审批',
+  'approval:submit': '提交审批',
+  'approval:handle': '处理审批',
+  'approval:approve': '审批通过/驳回',
 }
 
 export const dataScopeLabels: Record<DataScope, string> = {
@@ -104,6 +112,10 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'alert:rule:manage',
     'audit:view',
     'audit:export',
+    'approval:view',
+    'approval:submit',
+    'approval:handle',
+    'approval:approve',
   ],
   lab_manager: [
     'dashboard:view',
@@ -128,6 +140,9 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'alert:assign',
     'alert:rule:edit',
     'audit:view',
+    'approval:view',
+    'approval:submit',
+    'approval:handle',
   ],
   lab_staff: [
     'dashboard:view',
@@ -137,6 +152,8 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'consumable:view',
     'consumable:use',
     'alert:view',
+    'approval:view',
+    'approval:submit',
   ],
 }
 

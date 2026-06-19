@@ -9,6 +9,8 @@ import ConsumablesPage from '@/pages/ConsumablesPage.vue'
 import ConsumableDetailPage from '@/pages/ConsumableDetailPage.vue'
 import AlertsPage from '@/pages/AlertsPage.vue'
 import AuditLogsPage from '@/pages/AuditLogsPage.vue'
+import ApprovalsPage from '@/pages/ApprovalsPage.vue'
+import SystemSettingsPage from '@/pages/SystemSettingsPage.vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
 
@@ -73,6 +75,18 @@ const routes: RouteRecordRaw[] = [
         name: 'audit-logs',
         component: AuditLogsPage,
         meta: { title: '审计日志', permissions: ['audit:view'] },
+      },
+      {
+        path: 'approvals',
+        name: 'approvals',
+        component: ApprovalsPage,
+        meta: { title: '审批管理', permissions: ['approval:view'] },
+      },
+      {
+        path: 'system-settings',
+        name: 'system-settings',
+        component: SystemSettingsPage,
+        meta: { title: '系统配置', permissions: ['system:config'] },
       },
     ],
   },
