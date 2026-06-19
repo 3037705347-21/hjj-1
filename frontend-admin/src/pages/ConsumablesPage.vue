@@ -36,7 +36,23 @@ import {
   mockDeleteConsumable,
   mockGetConsumable,
   mockGetConsumableOperations,
+  mockBatchDeleteConsumables,
+  mockBatchUpdateConsumableCategory,
+  mockBatchUpdateConsumableLocation,
+  mockBatchImportConsumables,
+  downloadConsumableTemplate,
+  mockExportAllConsumables,
 } from '@/mock/consumables'
+import type { ImportResult } from '@/components/BatchImportDialog.vue'
+import BatchOperationBar from '@/components/BatchOperationBar.vue'
+import BatchImportDialog from '@/components/BatchImportDialog.vue'
+import BatchEditDialog from '@/components/BatchEditDialog.vue'
+import type { BatchEditField } from '@/components/BatchEditDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import {
+  Tags,
+  MapPin,
+} from 'lucide-vue-next'
 import type {
   Consumable,
   ConsumableFormData,
@@ -127,6 +143,25 @@ const formData = reactive<ConsumableFormData>({
 const operationModalVisible = ref(false)
 const currentOperationType = ref<ConsumableOperationType | null>(null)
 const currentOperationConsumable = ref<Consumable | null>(null)
+
+const selectedIds = ref<string[]>([])
+const showImportDialog = ref(false)
+const importLoading = ref(false)
+const importResult = ref<ImportResult | null>(null)
+
+const showBatchDeleteConfirm = ref(false)
+const batchDeleteLoading = ref(false)
+
+const showBatchEditDialog = ref(false)
+const batchEditType = ref<'category' | 'location'>('category')
+const batchEditFields = ref<BatchEditField[]>([])
+const batchEditLoading = ref(false)
+
+const batchActions = computed(() => [
+  { key: 'category', label: '批量修改分类', icon: Tags, type: 'default', permission: permission.canEditConsumable },
+  { key: 'location', label: '批量修改库位', icon: MapPin, type: 'default', permission: permission.canEditConsumable },
+  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger', permission: permission.canDeleteConsumable },
+])
 
 const fetchData = async () => {
   loading.value = true
@@ -359,6 +394,157 @@ const handleDelete = async (id: string) => {
   }
 }
 
+const toggleSelect = (id: string) => {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx > -1) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (selectedIds.value.length === data.value?.list.length) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = data.value?.list.map(c => c.id) || []
+  }
+}
+
+const clearSelection = () => {
+  selectedIds.value = []
+}
+
+const handleBatchAction = (action: string) => {
+  if (selectedIds.value.length === 0) {
+    alert('请先选择要操作的记录')
+    return
+  }
+  switch (action) {
+    case 'delete':
+      showBatchDeleteConfirm.value = true
+      break
+    case 'category':
+      batchEditType.value = 'category'
+      batchEditFields.value = [
+        {
+          key: 'category',
+          label: '分类',
+          type: 'select',
+          required: true,
+          options: consumableCategories.map(c => ({ label: c, value: c })),
+        },
+      ]
+      showBatchEditDialog.value = true
+      break
+    case 'location':
+      batchEditType.value = 'location'
+      batchEditFields.value = [
+        {
+          key: 'location',
+          label: '库位',
+          type: 'input',
+          required: true,
+          placeholder: '请输入库位',
+        },
+      ]
+      showBatchEditDialog.value = true
+      break
+  }
+}
+
+const handleBatchDelete = async () => {
+  batchDeleteLoading.value = true
+  try {
+    await mockBatchDeleteConsumables(selectedIds.value)
+    showBatchDeleteConfirm.value = false
+    clearSelection()
+    if (data.value?.list && selectedIds.value.length >= data.value.list.length && pagination.page > 1) {
+      pagination.page--
+    }
+    fetchData()
+    alert('删除成功')
+  } catch (e: any) {
+    alert(e.message || '删除失败')
+  } finally {
+    batchDeleteLoading.value = false
+  }
+}
+
+const handleBatchEditConfirm = async (values: Record<string, any>) => {
+  batchEditLoading.value = true
+  try {
+    if (batchEditType.value === 'category') {
+      await mockBatchUpdateConsumableCategory(selectedIds.value, values.category)
+    } else if (batchEditType.value === 'location') {
+      await mockBatchUpdateConsumableLocation(selectedIds.value, values.location)
+    }
+    showBatchEditDialog.value = false
+    clearSelection()
+    fetchData()
+    alert('修改成功')
+  } catch (e: any) {
+    alert(e.message || '修改失败')
+  } finally {
+    batchEditLoading.value = false
+  }
+}
+
+const handleBatchImport = async (file: File) => {
+  importLoading.value = true
+  importResult.value = null
+  try {
+    const result = await mockBatchImportConsumables(file)
+    importResult.value = result
+    fetchData()
+  } catch (e: any) {
+    alert(e.message || '导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+const handleDownloadTemplate = () => {
+  downloadConsumableTemplate()
+}
+
+const handleExport = async () => {
+  try {
+    const exportFilters = {
+      keyword: filters.value.keyword,
+      category: filters.value.category,
+      location: filters.value.location,
+      manufacturer: filters.value.manufacturer,
+      stockStatus: filters.value.stockStatus,
+      createTimeStart: filters.value.createTime?.[0] || '',
+      createTimeEnd: filters.value.createTime?.[1] || '',
+      updateTimeStart: filters.value.updateTime?.[0] || '',
+      updateTimeEnd: filters.value.updateTime?.[1] || '',
+    }
+    const allData = await mockExportAllConsumables(exportFilters)
+    if (!allData || allData.length === 0) {
+      alert('暂无数据可导出')
+      return
+    }
+    const columns = [
+      { key: 'name', label: '耗材名称' },
+      { key: 'category', label: '分类' },
+      { key: 'specification', label: '规格' },
+      { key: 'unit', label: '单位' },
+      { key: 'stockQuantity', label: '当前库存' },
+      { key: 'safetyStock', label: '安全库存' },
+      { key: 'manufacturer', label: '生产厂家' },
+      { key: 'location', label: '库位' },
+      { key: 'description', label: '描述' },
+      { key: 'createdAt', label: '创建时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+      { key: 'updatedAt', label: '更新时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+    ]
+    exportToCsv(allData, columns, `耗材列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
+  } catch (e: any) {
+    alert(e.message || '导出失败')
+  }
+}
+
 const goToDetail = (id: string) => {
   router.push(`/consumables/${id}`)
 }
@@ -427,18 +613,33 @@ onMounted(() => {
           v-model="filters"
           :filter-fields="filterFields"
           :saved-filters="savedFilters"
-          :show-export="permission.canCreateConsumable"
           :plain="true"
           :action-button-text="permission.canCreateConsumable ? '新增耗材' : undefined"
           keyword-placeholder="搜索耗材名称、厂家、货号、库位..."
           class="mb-6"
           @search="handleSearch"
           @reset="handleReset"
-          @export="handleExport"
           @action="handleAction"
           @save-filter="handleSaveFilter"
           @apply-filter="handleApplyFilter"
           @delete-filter="handleDeleteFilter"
+        />
+
+        <BatchOperationBar
+          :selected-count="selectedIds.length"
+          :total-count="data?.total || 0"
+          :actions="batchActions"
+          :show-import="permission.canCreateConsumable"
+          :show-export="permission.canViewConsumable"
+          :show-template="permission.canCreateConsumable"
+          :import-permission="permission.canCreateConsumable"
+          :export-permission="permission.canViewConsumable"
+          class="mb-6"
+          @action="handleBatchAction"
+          @import="showImportDialog = true; importResult = null"
+          @export="handleExport"
+          @download-template="handleDownloadTemplate"
+          @clear-selection="clearSelection"
         />
 
         <div v-if="loading" class="p-16 flex items-center justify-center">
@@ -450,6 +651,15 @@ onMounted(() => {
             <table class="w-full">
               <thead class="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  <th class="w-12 px-6 py-4 text-left">
+                    <input
+                      type="checkbox"
+                      :checked="selectedIds.length > 0 && selectedIds.length === data?.list.length"
+                      :indeterminate="selectedIds.length > 0 && selectedIds.length < (data?.list.length || 0)"
+                      class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      @change="toggleSelectAll"
+                    >
+                  </th>
                   <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     耗材名称
                   </th>
@@ -477,10 +687,21 @@ onMounted(() => {
                 <tr
                   v-for="item in data?.list"
                   :key="item.id"
-                  class="hover:bg-gray-50 transition-colors cursor-pointer"
-                  :class="{ 'bg-danger-50/30': isLowStock(item) }"
+                  :class="[
+                    'hover:bg-gray-50 transition-colors cursor-pointer',
+                    selectedIds.includes(item.id) ? 'bg-primary-50/50' : '',
+                    { 'bg-danger-50/30': isLowStock(item) }
+                  ]"
                   @click="goToDetail(item.id)"
                 >
+                  <td class="w-12 px-6 py-4" @click.stop>
+                    <input
+                      type="checkbox"
+                      :checked="selectedIds.includes(item.id)"
+                      class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                      @change="toggleSelect(item.id)"
+                    >
+                  </td>
                   <td class="px-6 py-4" @click.stop>
                     <div class="flex items-center gap-3">
                       <div
@@ -1018,6 +1239,34 @@ onMounted(() => {
       :consumable="currentOperationConsumable"
       :operation-type="currentOperationType"
       @success="handleOperationSuccess"
+    />
+
+    <BatchImportDialog
+      v-model:visible="showImportDialog"
+      title="批量导入耗材"
+      :loading="importLoading"
+      :result="importResult"
+      accept=".csv"
+      @import="handleBatchImport"
+      @download-template="handleDownloadTemplate"
+    />
+
+    <BatchEditDialog
+      v-model:visible="showBatchEditDialog"
+      :title="batchEditType === 'category' ? '批量修改分类' : '批量修改库位'"
+      :fields="batchEditFields"
+      :selected-count="selectedIds.length"
+      :loading="batchEditLoading"
+      @confirm="handleBatchEditConfirm"
+    />
+
+    <ConfirmDialog
+      v-model:visible="showBatchDeleteConfirm"
+      title="确认删除"
+      :message="`确定要删除选中的 ${selectedIds.length} 条耗材吗？删除后相关流水记录也会被清除，且无法恢复。`"
+      confirm-text="确认删除"
+      type="danger"
+      @confirm="handleBatchDelete"
     />
   </div>
 </template>

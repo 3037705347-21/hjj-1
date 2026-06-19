@@ -803,3 +803,319 @@ export function mockGetOperatorNames(): Promise<string[]> {
     }, 100)
   })
 }
+
+export function mockBatchDeleteConsumables(ids: string[]): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const consumables = getConsumablesFromStorage()
+      const filtered = consumables.filter(c => !ids.includes(c.id))
+      saveConsumablesToStorage(filtered)
+
+      const operations = getOperationsFromStorage()
+      const filteredOps = operations.filter(o => !ids.includes(o.consumableId))
+      saveOperationsToStorage(filteredOps)
+
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateConsumableCategory(ids: string[], category: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const consumables = getConsumablesFromStorage()
+      const now = new Date().toISOString()
+      const updated = consumables.map(c => {
+        if (ids.includes(c.id)) {
+          return { ...c, category, updatedAt: now }
+        }
+        return c
+      })
+      saveConsumablesToStorage(updated)
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateConsumableLocation(ids: string[], location: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const consumables = getConsumablesFromStorage()
+      const user = getCurrentUser()
+      const operations = getOperationsFromStorage()
+      const now = new Date().toISOString()
+
+      const updatedConsumables = consumables.map(c => {
+        if (ids.includes(c.id) && c.location !== location) {
+          const operation: ConsumableOperation = {
+            id: generateId(),
+            consumableId: c.id,
+            consumableName: c.name,
+            type: 'transfer',
+            quantity: c.stockQuantity,
+            beforeQuantity: c.stockQuantity,
+            afterQuantity: c.stockQuantity,
+            operator: user?.id || '3',
+            operatorName: user?.name || '王实验员',
+            reason: '批量调拨',
+            remark: '',
+            targetLocation: location,
+            createdAt: now,
+          }
+          operations.unshift(operation)
+          return { ...c, location, updatedAt: now }
+        }
+        return c
+      })
+
+      saveConsumablesToStorage(updatedConsumables)
+      saveOperationsToStorage(operations)
+      resolve()
+    }, 300)
+  })
+}
+
+export interface ConsumableImportResultItem {
+  row: number
+  success: boolean
+  message: string
+  data?: Record<string, any>
+}
+
+export interface ConsumableImportResult {
+  total: number
+  success: number
+  failed: number
+  items: ConsumableImportResultItem[]
+}
+
+function validateConsumableData(rowData: Record<string, any>): string[] {
+  const errors: string[] = []
+  if (!rowData['耗材名称'] || !String(rowData['耗材名称']).trim()) {
+    errors.push('耗材名称不能为空')
+  }
+  if (!rowData['分类'] || !String(rowData['分类']).trim()) {
+    errors.push('分类不能为空')
+  }
+  if (!rowData['规格'] || !String(rowData['规格']).trim()) {
+    errors.push('规格不能为空')
+  }
+  if (!rowData['单位'] || !String(rowData['单位']).trim()) {
+    errors.push('单位不能为空')
+  }
+  return errors
+}
+
+function parseCsvContent(content: string): string[][] {
+  const lines = content.split(/\r?\n/).filter(line => line.trim())
+  return lines.map(line => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current)
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current)
+    return result
+  })
+}
+
+export async function mockBatchImportConsumables(file: File): Promise<ConsumableImportResult> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string
+        const rows = parseCsvContent(content)
+        if (rows.length < 2) {
+          reject(new Error('文件格式不正确或数据为空'))
+          return
+        }
+
+        const headers = rows[0]
+        const dataRows = rows.slice(1)
+
+        const consumables = getConsumablesFromStorage()
+        const now = new Date().toISOString()
+        const result: ConsumableImportResult = {
+          total: dataRows.length,
+          success: 0,
+          failed: 0,
+          items: [],
+        }
+
+        dataRows.forEach((row, index) => {
+          const rowData: Record<string, string> = {}
+          headers.forEach((header, i) => {
+            rowData[header.trim()] = row[i] || ''
+          })
+
+          const rowNum = index + 2
+          const errors = validateConsumableData(rowData)
+
+          if (errors.length > 0) {
+            result.failed++
+            result.items.push({
+              row: rowNum,
+              success: false,
+              message: errors.join('；'),
+            })
+          } else {
+            const newConsumable: Consumable = {
+              id: generateId(),
+              name: String(rowData['耗材名称'] || '').trim(),
+              category: String(rowData['分类'] || '').trim(),
+              specification: String(rowData['规格'] || '').trim(),
+              unit: String(rowData['单位'] || '').trim(),
+              stockQuantity: Number(rowData['当前库存'] || 0),
+              safetyStock: Number(rowData['安全库存'] || 0),
+              manufacturer: rowData['生产厂家'] || '',
+              location: rowData['库位'] || '',
+              description: rowData['描述'] || '',
+              createdAt: now,
+              updatedAt: now,
+            }
+            consumables.unshift(newConsumable)
+            result.success++
+            result.items.push({
+              row: rowNum,
+              success: true,
+              message: '导入成功',
+              data: newConsumable,
+            })
+          }
+        })
+
+        saveConsumablesToStorage(consumables)
+        resolve(result)
+      } catch (err: any) {
+        reject(new Error('文件解析失败：' + err.message))
+      }
+    }
+    reader.onerror = () => reject(new Error('文件读取失败'))
+    reader.readAsText(file, 'UTF-8')
+  })
+}
+
+export function downloadConsumableTemplate(): void {
+  const headers = ['耗材名称', '分类', '规格', '单位', '当前库存', '安全库存', '生产厂家', '库位', '描述']
+  const sampleRow = ['一次性手套', '手套', 'M号/100只/盒', '盒', '10', '5', '爱马斯', '耗材柜A-01', '无粉丁腈手套']
+
+  const csvContent = [
+    headers.join(','),
+    sampleRow.map(v => `"${v}"`).join(','),
+  ].join('\n')
+
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.setAttribute('href', url)
+  link.setAttribute('download', '耗材导入模板.csv')
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export interface ConsumableFilterParams {
+  keyword?: string
+  category?: string
+  location?: string
+  manufacturer?: string
+  stockStatus?: string
+  createTimeStart?: string
+  createTimeEnd?: string
+  updateTimeStart?: string
+  updateTimeEnd?: string
+}
+
+export async function mockExportAllConsumables(filters?: ConsumableFilterParams): Promise<Consumable[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      let consumables = getConsumablesFromStorage()
+
+      if (filters) {
+        const {
+          keyword,
+          category,
+          location,
+          manufacturer,
+          stockStatus,
+          createTimeStart,
+          createTimeEnd,
+          updateTimeStart,
+          updateTimeEnd,
+        } = filters
+
+        if (keyword) {
+          const kw = keyword.toLowerCase()
+          consumables = consumables.filter(
+            (c) =>
+              c.name.toLowerCase().includes(kw) ||
+              c.manufacturer?.toLowerCase().includes(kw) ||
+              c.location?.toLowerCase().includes(kw) ||
+              c.description?.toLowerCase().includes(kw)
+          )
+        }
+
+        if (category) {
+          consumables = consumables.filter((c) => c.category === category)
+        }
+
+        if (location) {
+          const loc = location.toLowerCase()
+          consumables = consumables.filter((c) => c.location?.toLowerCase().includes(loc))
+        }
+
+        if (manufacturer) {
+          const mf = manufacturer.toLowerCase()
+          consumables = consumables.filter((c) => c.manufacturer?.toLowerCase().includes(mf))
+        }
+
+        if (stockStatus === 'low') {
+          consumables = consumables.filter((c) => c.stockQuantity <= c.safetyStock)
+        } else if (stockStatus === 'normal') {
+          consumables = consumables.filter((c) => c.stockQuantity > c.safetyStock)
+        }
+
+        if (createTimeStart) {
+          const start = new Date(createTimeStart).getTime()
+          consumables = consumables.filter((c) => new Date(c.createdAt).getTime() >= start)
+        }
+
+        if (createTimeEnd) {
+          const end = new Date(createTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          consumables = consumables.filter((c) => new Date(c.createdAt).getTime() < end)
+        }
+
+        if (updateTimeStart) {
+          const start = new Date(updateTimeStart).getTime()
+          consumables = consumables.filter((c) => new Date(c.updatedAt).getTime() >= start)
+        }
+
+        if (updateTimeEnd) {
+          const end = new Date(updateTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          consumables = consumables.filter((c) => new Date(c.updatedAt).getTime() < end)
+        }
+      }
+
+      consumables.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      resolve(consumables)
+    }, 300)
+  })
+}

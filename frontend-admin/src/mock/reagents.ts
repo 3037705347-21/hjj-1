@@ -489,3 +489,328 @@ export function mockGetAllReagents(): Promise<Reagent[]> {
     }, 200)
   })
 }
+
+export function mockBatchDeleteReagents(ids: string[]): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const reagents = getReagentsFromStorage()
+      const filtered = reagents.filter(r => !ids.includes(r.id))
+      saveReagentsToStorage(filtered)
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateReagentCategory(ids: string[], category: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const reagents = getReagentsFromStorage()
+      const now = new Date().toISOString()
+      const updated = reagents.map(r => {
+        if (ids.includes(r.id)) {
+          return { ...r, category, updatedAt: now }
+        }
+        return r
+      })
+      saveReagentsToStorage(updated)
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateReagentStorageCondition(ids: string[], storageCondition: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const reagents = getReagentsFromStorage()
+      const now = new Date().toISOString()
+      const updated = reagents.map(r => {
+        if (ids.includes(r.id)) {
+          return { ...r, storageCondition, updatedAt: now }
+        }
+        return r
+      })
+      saveReagentsToStorage(updated)
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateReagentStatus(ids: string[], enabled: boolean): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const reagents = getReagentsFromStorage()
+      const now = new Date().toISOString()
+      const updated = reagents.map(r => {
+        if (ids.includes(r.id)) {
+          return { ...r, enabled, updatedAt: now }
+        }
+        return r
+      })
+      saveReagentsToStorage(updated)
+      resolve()
+    }, 300)
+  })
+}
+
+export interface ImportResultItem {
+  row: number
+  success: boolean
+  message: string
+  data?: Record<string, any>
+}
+
+export interface ImportResult {
+  total: number
+  success: number
+  failed: number
+  items: ImportResultItem[]
+}
+
+function validateReagentData(rowData: Record<string, any>, rowIndex: number): string[] {
+  const errors: string[] = []
+  if (!rowData['试剂名称'] || !String(rowData['试剂名称']).trim()) {
+    errors.push('试剂名称不能为空')
+  }
+  if (!rowData['分类'] || !String(rowData['分类']).trim()) {
+    errors.push('分类不能为空')
+  }
+  if (!rowData['规格'] || !String(rowData['规格']).trim()) {
+    errors.push('规格不能为空')
+  }
+  if (!rowData['单位'] || !String(rowData['单位']).trim()) {
+    errors.push('单位不能为空')
+  }
+  if (!rowData['储存条件'] || !String(rowData['储存条件']).trim()) {
+    errors.push('储存条件不能为空')
+  }
+  return errors
+}
+
+function parseCsvContent(content: string): string[][] {
+  const lines = content.split(/\r?\n/).filter(line => line.trim())
+  return lines.map(line => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current)
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current)
+    return result
+  })
+}
+
+export async function mockBatchImportReagents(file: File): Promise<ImportResult> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string
+        const rows = parseCsvContent(content)
+        if (rows.length < 2) {
+          reject(new Error('文件格式不正确或数据为空'))
+          return
+        }
+
+        const headers = rows[0]
+        const dataRows = rows.slice(1)
+
+        const reagents = getReagentsFromStorage()
+        const now = new Date().toISOString()
+        const result: ImportResult = {
+          total: dataRows.length,
+          success: 0,
+          failed: 0,
+          items: [],
+        }
+
+        dataRows.forEach((row, index) => {
+          const rowData: Record<string, string> = {}
+          headers.forEach((header, i) => {
+            rowData[header.trim()] = row[i] || ''
+          })
+
+          const rowNum = index + 2
+          const errors = validateReagentData(rowData, rowNum)
+
+          if (errors.length > 0) {
+            result.failed++
+            result.items.push({
+              row: rowNum,
+              success: false,
+              message: errors.join('；'),
+            })
+          } else {
+            const newReagent: Reagent = {
+              id: generateId(),
+              name: String(rowData['试剂名称'] || '').trim(),
+              casNumber: rowData['CAS号'] || '',
+              category: String(rowData['分类'] || '').trim(),
+              specification: String(rowData['规格'] || '').trim(),
+              unit: String(rowData['单位'] || '').trim(),
+              manufacturer: rowData['生产厂家'] || '',
+              brand: rowData['品牌'] || '',
+              catalogNumber: rowData['货号'] || '',
+              purity: rowData['纯度'] || '',
+              concentration: rowData['浓度'] || '',
+              packagingSpec: rowData['包装规格'] || '',
+              experimentTypes: rowData['适用实验类型'] ? String(rowData['适用实验类型']).split(/[,，;；]/).map(s => s.trim()).filter(Boolean) : [],
+              aliases: rowData['别名'] || '',
+              openedValidity: rowData['开封后有效期'] || '',
+              incompatibilities: rowData['禁配信息'] || '',
+              enabled: rowData['状态'] ? rowData['状态'] === '启用' : true,
+              storageCondition: String(rowData['储存条件'] || '').trim(),
+              description: rowData['描述'] || '',
+              hazardLevel: (rowData['危险等级'] as 'low' | 'medium' | 'high') || 'low',
+              createdAt: now,
+              updatedAt: now,
+            }
+            reagents.unshift(newReagent)
+            result.success++
+            result.items.push({
+              row: rowNum,
+              success: true,
+              message: '导入成功',
+              data: newReagent,
+            })
+          }
+        })
+
+        saveReagentsToStorage(reagents)
+        resolve(result)
+      } catch (err: any) {
+        reject(new Error('文件解析失败：' + err.message))
+      }
+    }
+    reader.onerror = () => reject(new Error('文件读取失败'))
+    reader.readAsText(file, 'UTF-8')
+  })
+}
+
+export function downloadReagentTemplate(): void {
+  const headers = ['试剂名称', 'CAS号', '分类', '品牌', '货号', '规格', '单位', '生产厂家', '纯度', '浓度', '包装规格', '储存条件', '危险等级', '状态', '开封后有效期', '别名', '适用实验类型', '禁配信息', '描述']
+  const sampleRow = ['牛血清白蛋白 BSA', '9048-46-8', '蛋白质', 'Sigma-Aldrich', 'A7906-100ML', '100mg/mL', 'mL', 'Sigma-Aldrich', '≥98%', '100mg/mL', '100mL/瓶', '2-8°C', 'low', '启用', '30天', 'BSA; Bovine Serum Albumin', 'Western Blot,ELISA,免疫组化', '避免与强氧化剂接触', '用于Western Blot封闭液配制']
+
+  const csvContent = [
+    headers.join(','),
+    sampleRow.map(v => `"${v}"`).join(','),
+  ].join('\n')
+
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.setAttribute('href', url)
+  link.setAttribute('download', '试剂导入模板.csv')
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export async function mockExportAllReagents(filters?: ReagentFilterParams): Promise<Reagent[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      let reagents = getReagentsFromStorage()
+
+      if (filters) {
+        const {
+          keyword,
+          category,
+          brand,
+          hazardLevel,
+          storageCondition,
+          enabled,
+          manufacturer,
+          casNumber,
+          createTimeStart,
+          createTimeEnd,
+          updateTimeStart,
+          updateTimeEnd,
+        } = filters
+
+        if (keyword) {
+          const kw = keyword.toLowerCase()
+          reagents = reagents.filter(
+            (r) =>
+              r.name.toLowerCase().includes(kw) ||
+              r.casNumber?.toLowerCase().includes(kw) ||
+              r.manufacturer?.toLowerCase().includes(kw) ||
+              r.brand?.toLowerCase().includes(kw) ||
+              r.catalogNumber?.toLowerCase().includes(kw) ||
+              r.aliases?.toLowerCase().includes(kw) ||
+              r.description?.toLowerCase().includes(kw)
+          )
+        }
+
+        if (category) {
+          reagents = reagents.filter((r) => r.category === category)
+        }
+
+        if (brand) {
+          reagents = reagents.filter((r) => r.brand === brand)
+        }
+
+        if (hazardLevel) {
+          reagents = reagents.filter((r) => r.hazardLevel === hazardLevel)
+        }
+
+        if (storageCondition) {
+          reagents = reagents.filter((r) => r.storageCondition === storageCondition)
+        }
+
+        if (enabled !== undefined && enabled !== '') {
+          const enabledBool = enabled === 'true'
+          reagents = reagents.filter((r) => r.enabled === enabledBool)
+        }
+
+        if (manufacturer) {
+          const mf = manufacturer.toLowerCase()
+          reagents = reagents.filter((r) => r.manufacturer?.toLowerCase().includes(mf))
+        }
+
+        if (casNumber) {
+          const cn = casNumber.toLowerCase()
+          reagents = reagents.filter((r) => r.casNumber?.toLowerCase().includes(cn))
+        }
+
+        if (createTimeStart) {
+          const start = new Date(createTimeStart).getTime()
+          reagents = reagents.filter((r) => new Date(r.createdAt).getTime() >= start)
+        }
+
+        if (createTimeEnd) {
+          const end = new Date(createTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          reagents = reagents.filter((r) => new Date(r.createdAt).getTime() < end)
+        }
+
+        if (updateTimeStart) {
+          const start = new Date(updateTimeStart).getTime()
+          reagents = reagents.filter((r) => new Date(r.updatedAt).getTime() >= start)
+        }
+
+        if (updateTimeEnd) {
+          const end = new Date(updateTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          reagents = reagents.filter((r) => new Date(r.updatedAt).getTime() < end)
+        }
+      }
+
+      reagents.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      resolve(reagents)
+    }, 300)
+  })
+}

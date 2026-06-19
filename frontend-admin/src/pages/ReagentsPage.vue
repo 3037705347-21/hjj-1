@@ -31,7 +31,26 @@ import {
   mockUpdateReagent,
   mockDeleteReagent,
   mockGetReagent,
+  mockBatchDeleteReagents,
+  mockBatchUpdateReagentCategory,
+  mockBatchUpdateReagentStorageCondition,
+  mockBatchUpdateReagentStatus,
+  mockBatchImportReagents,
+  downloadReagentTemplate,
+  mockExportAllReagents,
 } from '@/mock/reagents'
+import type { ImportResult } from '@/components/BatchImportDialog.vue'
+import BatchOperationBar from '@/components/BatchOperationBar.vue'
+import BatchImportDialog from '@/components/BatchImportDialog.vue'
+import BatchEditDialog from '@/components/BatchEditDialog.vue'
+import type { BatchEditField } from '@/components/BatchEditDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import {
+  Trash2,
+  Tags,
+  Thermometer,
+  Power,
+} from 'lucide-vue-next'
 import type { Reagent, ReagentFormData, Attachment } from '@/types/reagent'
 import type { PageResult } from '@/types/common'
 import {
@@ -98,6 +117,27 @@ const currentId = ref('')
 const formLoading = ref(false)
 const detailLoading = ref(false)
 const detailData = ref<Reagent | null>(null)
+
+const selectedIds = ref<string[]>([])
+const showImportDialog = ref(false)
+const importLoading = ref(false)
+const importResult = ref<ImportResult | null>(null)
+
+const showBatchDeleteConfirm = ref(false)
+const batchDeleteLoading = ref(false)
+
+const showBatchEditDialog = ref(false)
+const batchEditType = ref<'category' | 'storage' | 'status'>('category')
+const batchEditFields = ref<BatchEditField[]>([])
+const batchEditLoading = ref(false)
+
+const batchActions = computed(() => [
+  { key: 'category', label: '批量修改分类', icon: Tags, type: 'default', permission: permission.canEditReagent },
+  { key: 'storage', label: '批量修改储存条件', icon: Thermometer, type: 'default', permission: permission.canEditReagent },
+  { key: 'enable', label: '批量启用', icon: Power, type: 'default', permission: permission.canEditReagent },
+  { key: 'disable', label: '批量停用', icon: Power, type: 'warning', permission: permission.canEditReagent },
+  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger', permission: permission.canDeleteReagent },
+])
 
 const defaultFormData = (): ReagentFormData => ({
   name: '',
@@ -326,6 +366,182 @@ const handleDelete = async (id: string) => {
   }
 }
 
+const toggleSelect = (id: string) => {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx > -1) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (selectedIds.value.length === data.value?.list.length) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = data.value?.list.map(r => r.id) || []
+  }
+}
+
+const clearSelection = () => {
+  selectedIds.value = []
+}
+
+const handleBatchAction = (action: string) => {
+  if (selectedIds.value.length === 0) {
+    alert('请先选择要操作的记录')
+    return
+  }
+  switch (action) {
+    case 'delete':
+      showBatchDeleteConfirm.value = true
+      break
+    case 'category':
+      batchEditType.value = 'category'
+      batchEditFields.value = [
+        {
+          key: 'category',
+          label: '分类',
+          type: 'select',
+          required: true,
+          options: reagentCategories.map(c => ({ label: c, value: c })),
+        },
+      ]
+      showBatchEditDialog.value = true
+      break
+    case 'storage':
+      batchEditType.value = 'storage'
+      batchEditFields.value = [
+        {
+          key: 'storageCondition',
+          label: '储存条件',
+          type: 'select',
+          required: true,
+          options: storageConditions.map(s => ({ label: s, value: s })),
+        },
+      ]
+      showBatchEditDialog.value = true
+      break
+    case 'enable':
+      handleBatchStatusUpdate(true)
+      break
+    case 'disable':
+      handleBatchStatusUpdate(false)
+      break
+  }
+}
+
+const handleBatchDelete = async () => {
+  batchDeleteLoading.value = true
+  try {
+    await mockBatchDeleteReagents(selectedIds.value)
+    showBatchDeleteConfirm.value = false
+    clearSelection()
+    if (data.value?.list && selectedIds.value.length >= data.value.list.length && pagination.page > 1) {
+      pagination.page--
+    }
+    fetchData()
+    alert('删除成功')
+  } catch (e: any) {
+    alert(e.message || '删除失败')
+  } finally {
+    batchDeleteLoading.value = false
+  }
+}
+
+const handleBatchEditConfirm = async (values: Record<string, any>) => {
+  batchEditLoading.value = true
+  try {
+    if (batchEditType.value === 'category') {
+      await mockBatchUpdateReagentCategory(selectedIds.value, values.category)
+    } else if (batchEditType.value === 'storage') {
+      await mockBatchUpdateReagentStorageCondition(selectedIds.value, values.storageCondition)
+    }
+    showBatchEditDialog.value = false
+    clearSelection()
+    fetchData()
+    alert('修改成功')
+  } catch (e: any) {
+    alert(e.message || '修改失败')
+  } finally {
+    batchEditLoading.value = false
+  }
+}
+
+const handleBatchStatusUpdate = async (enabled: boolean) => {
+  if (!confirm(`确定要批量${enabled ? '启用' : '停用'}选中的 ${selectedIds.value.length} 条记录吗？`)) {
+    return
+  }
+  try {
+    await mockBatchUpdateReagentStatus(selectedIds.value, enabled)
+    clearSelection()
+    fetchData()
+    alert('操作成功')
+  } catch (e: any) {
+    alert(e.message || '操作失败')
+  }
+}
+
+const handleBatchImport = async (file: File) => {
+  importLoading.value = true
+  importResult.value = null
+  try {
+    const result = await mockBatchImportReagents(file)
+    importResult.value = result
+    fetchData()
+  } catch (e: any) {
+    alert(e.message || '导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+const handleDownloadTemplate = () => {
+  downloadReagentTemplate()
+}
+
+const handleExport = async () => {
+  try {
+    const exportFilters = {
+      keyword: filters.value.keyword,
+      category: filters.value.category,
+      brand: filters.value.brand,
+      hazardLevel: filters.value.hazardLevel,
+      storageCondition: filters.value.storageCondition,
+      enabled: filters.value.enabled,
+      manufacturer: filters.value.manufacturer,
+      casNumber: filters.value.casNumber,
+      createTimeStart: filters.value.createTime?.[0] || '',
+      createTimeEnd: filters.value.createTime?.[1] || '',
+      updateTimeStart: filters.value.updateTime?.[0] || '',
+      updateTimeEnd: filters.value.updateTime?.[1] || '',
+    }
+    const allData = await mockExportAllReagents(exportFilters)
+    if (!allData || allData.length === 0) {
+      alert('暂无数据可导出')
+      return
+    }
+    const columns = [
+      { key: 'name', label: '试剂名称' },
+      { key: 'casNumber', label: 'CAS号' },
+      { key: 'category', label: '分类' },
+      { key: 'brand', label: '品牌' },
+      { key: 'catalogNumber', label: '货号' },
+      { key: 'manufacturer', label: '生产厂家' },
+      { key: 'specification', label: '规格' },
+      { key: 'unit', label: '单位' },
+      { key: 'storageCondition', label: '存储条件' },
+      { key: 'hazardLevel', label: '危险等级', formatter: (v: string) => hazardLevelLabels[v as keyof typeof hazardLevelLabels] || v },
+      { key: 'enabled', label: '状态', formatter: (v: boolean) => enabledStatusLabels[String(v) as 'true' | 'false'] },
+      { key: 'createdAt', label: '创建时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+      { key: 'updatedAt', label: '更新时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+    ]
+    exportToCsv(allData, columns, `试剂列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
+  } catch (e: any) {
+    alert(e.message || '导出失败')
+  }
+}
+
 const goToBatches = (id: string) => {
   router.push(`/batches?reagentId=${id}`)
 }
@@ -392,16 +608,30 @@ onMounted(() => {
       v-model="filters"
       :filter-fields="filterFields"
       :saved-filters="savedFilters"
-      :show-export="permission.canCreateReagent"
       :action-button-text="permission.canCreateReagent ? '新增试剂' : undefined"
       keyword-placeholder="搜索试剂名称、CAS号、批次号、厂家、货号、库位..."
       @search="handleSearch"
       @reset="handleReset"
-      @export="handleExport"
       @action="handleAction"
       @save-filter="handleSaveFilter"
       @apply-filter="handleApplyFilter"
       @delete-filter="handleDeleteFilter"
+    />
+
+    <BatchOperationBar
+      :selected-count="selectedIds.length"
+      :total-count="data?.total || 0"
+      :actions="batchActions"
+      :show-import="permission.canCreateReagent"
+      :show-export="permission.canViewReagent"
+      :show-template="permission.canCreateReagent"
+      :import-permission="permission.canCreateReagent"
+      :export-permission="permission.canViewReagent"
+      @action="handleBatchAction"
+      @import="showImportDialog = true; importResult = null"
+      @export="handleExport"
+      @download-template="handleDownloadTemplate"
+      @clear-selection="clearSelection"
     />
 
     <div class="bg-white rounded-xl shadow-card overflow-hidden">
@@ -417,6 +647,15 @@ onMounted(() => {
           <table class="w-full">
             <thead class="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th class="w-12 px-6 py-4 text-left">
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.length > 0 && selectedIds.length === data?.list.length"
+                    :indeterminate="selectedIds.length > 0 && selectedIds.length < (data?.list.length || 0)"
+                    class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    @change="toggleSelectAll"
+                  >
+                </th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">试剂名称</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CAS号</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">分类</th>
@@ -431,8 +670,16 @@ onMounted(() => {
               <tr
                 v-for="reagent in data?.list"
                 :key="reagent.id"
-                class="hover:bg-gray-50 transition-colors"
+                :class="['hover:bg-gray-50 transition-colors', selectedIds.includes(reagent.id) ? 'bg-primary-50/50' : '']"
               >
+                <td class="w-12 px-6 py-4">
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.includes(reagent.id)"
+                    class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    @change="toggleSelect(reagent.id)"
+                  >
+                </td>
                 <td class="px-6 py-4">
                   <div class="flex items-center gap-3">
                     <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center flex-shrink-0">
@@ -1163,5 +1410,33 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <BatchImportDialog
+      v-model:visible="showImportDialog"
+      title="批量导入试剂"
+      :loading="importLoading"
+      :result="importResult"
+      accept=".csv"
+      @import="handleBatchImport"
+      @download-template="handleDownloadTemplate"
+    />
+
+    <BatchEditDialog
+      v-model:visible="showBatchEditDialog"
+      :title="batchEditType === 'category' ? '批量修改分类' : '批量修改储存条件'"
+      :fields="batchEditFields"
+      :selected-count="selectedIds.length"
+      :loading="batchEditLoading"
+      @confirm="handleBatchEditConfirm"
+    />
+
+    <ConfirmDialog
+      v-model:visible="showBatchDeleteConfirm"
+      title="确认删除"
+      :message="`确定要删除选中的 ${selectedIds.length} 条试剂吗？删除后将无法恢复。`"
+      confirm-text="确认删除"
+      type="danger"
+      @confirm="handleBatchDelete"
+    />
   </div>
 </template>

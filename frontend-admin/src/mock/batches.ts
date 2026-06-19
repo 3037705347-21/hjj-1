@@ -778,3 +778,390 @@ export function mockGetBatchStats(): Promise<{
     }, 200)
   })
 }
+
+export function mockBatchDeleteBatches(ids: string[]): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const batches = getBatchesFromStorage()
+      const filtered = batches.filter(b => !ids.includes(b.id))
+      saveBatchesToStorage(filtered)
+
+      const operations = getOperationsFromStorage()
+      const filteredOps = operations.filter(o => !ids.includes(o.batchId))
+      saveOperationsToStorage(filteredOps)
+
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateBatchLocation(ids: string[], storageLocation: string): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const batches = getBatchesFromStorage()
+      const user = getCurrentUser()
+      const operations = getOperationsFromStorage()
+
+      const updatedBatches = batches.map(b => {
+        if (ids.includes(b.id) && b.storageLocation !== storageLocation) {
+          const operation: BatchOperation = {
+            id: generateId(),
+            batchId: b.id,
+            type: 'transfer',
+            quantity: b.remainingQuantity,
+            beforeQuantity: b.remainingQuantity,
+            afterQuantity: b.remainingQuantity,
+            operator: user?.id || '3',
+            operatorName: user?.name || '王实验员',
+            reason: '批量调拨',
+            remark: '',
+            targetLocation: storageLocation,
+            createdAt: new Date().toISOString(),
+          }
+          operations.unshift(operation)
+          return { ...b, storageLocation }
+        }
+        return b
+      })
+
+      saveBatchesToStorage(updatedBatches)
+      saveOperationsToStorage(operations)
+      resolve()
+    }, 300)
+  })
+}
+
+export function mockBatchUpdateBatchStatus(ids: string[], status: 'freeze' | 'unfreeze'): Promise<void> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      try {
+        const batches = getBatchesFromStorage()
+        const user = getCurrentUser()
+        const operations = getOperationsFromStorage()
+
+        const updatedBatches = batches.map(b => {
+          if (ids.includes(b.id)) {
+            if (status === 'freeze') {
+              if (b.status === 'expired' || b.status === 'exhausted' || b.status === 'frozen') {
+                return b
+              }
+              const operation: BatchOperation = {
+                id: generateId(),
+                batchId: b.id,
+                type: 'freeze',
+                quantity: 0,
+                beforeQuantity: b.remainingQuantity,
+                afterQuantity: b.remainingQuantity,
+                operator: user?.id || '3',
+                operatorName: user?.name || '王实验员',
+                reason: '批量冻结',
+                remark: '',
+                createdAt: new Date().toISOString(),
+              }
+              operations.unshift(operation)
+              return { ...b, status: 'frozen' as const }
+            } else {
+              if (b.status !== 'frozen') {
+                return b
+              }
+              const operation: BatchOperation = {
+                id: generateId(),
+                batchId: b.id,
+                type: 'unfreeze',
+                quantity: 0,
+                beforeQuantity: b.remainingQuantity,
+                afterQuantity: b.remainingQuantity,
+                operator: user?.id || '3',
+                operatorName: user?.name || '王实验员',
+                reason: '批量解冻',
+                remark: '',
+                createdAt: new Date().toISOString(),
+              }
+              operations.unshift(operation)
+              return recalculateStatus(b)
+            }
+          }
+          return b
+        })
+
+        saveBatchesToStorage(updatedBatches)
+        saveOperationsToStorage(operations)
+        resolve()
+      } catch (e: any) {
+        reject(e)
+      }
+    }, 300)
+  })
+}
+
+export interface BatchImportResultItem {
+  row: number
+  success: boolean
+  message: string
+  data?: Record<string, any>
+}
+
+export interface BatchImportResult {
+  total: number
+  success: number
+  failed: number
+  items: BatchImportResultItem[]
+}
+
+function validateBatchData(rowData: Record<string, any>, reagents: any[]): string[] {
+  const errors: string[] = []
+  if (!rowData['试剂名称'] || !String(rowData['试剂名称']).trim()) {
+    errors.push('试剂名称不能为空')
+  } else {
+    const reagent = reagents.find(r => r.name === rowData['试剂名称'])
+    if (!reagent) {
+      errors.push(`试剂「${rowData['试剂名称']}」不存在`)
+    }
+  }
+  if (!rowData['批次号'] || !String(rowData['批次号']).trim()) {
+    errors.push('批次号不能为空')
+  }
+  if (!rowData['生产日期']) {
+    errors.push('生产日期不能为空')
+  }
+  if (!rowData['有效期至']) {
+    errors.push('有效期至不能为空')
+  }
+  if (!rowData['初始数量'] || isNaN(Number(rowData['初始数量'])) || Number(rowData['初始数量']) <= 0) {
+    errors.push('初始数量必须大于0')
+  }
+  if (!rowData['库位'] || !String(rowData['库位']).trim()) {
+    errors.push('库位不能为空')
+  }
+  return errors
+}
+
+function parseCsvContent(content: string): string[][] {
+  const lines = content.split(/\r?\n/).filter(line => line.trim())
+  return lines.map(line => {
+    const result: string[] = []
+    let current = ''
+    let inQuotes = false
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i]
+      if (char === '"') {
+        if (inQuotes && line[i + 1] === '"') {
+          current += '"'
+          i++
+        } else {
+          inQuotes = !inQuotes
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current)
+        current = ''
+      } else {
+        current += char
+      }
+    }
+    result.push(current)
+    return result
+  })
+}
+
+export async function mockBatchImportBatches(file: File): Promise<BatchImportResult> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const reagents = await mockGetAllReagents()
+
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        try {
+          const content = e.target?.result as string
+          const rows = parseCsvContent(content)
+          if (rows.length < 2) {
+            reject(new Error('文件格式不正确或数据为空'))
+            return
+          }
+
+          const headers = rows[0]
+          const dataRows = rows.slice(1)
+
+          const batches = getBatchesFromStorage()
+          const now = new Date().toISOString()
+          const result: BatchImportResult = {
+            total: dataRows.length,
+            success: 0,
+            failed: 0,
+            items: [],
+          }
+
+          dataRows.forEach((row, index) => {
+            const rowData: Record<string, string> = {}
+            headers.forEach((header, i) => {
+              rowData[header.trim()] = row[i] || ''
+            })
+
+            const rowNum = index + 2
+            const errors = validateBatchData(rowData, reagents)
+
+            if (errors.length > 0) {
+              result.failed++
+              result.items.push({
+                row: rowNum,
+                success: false,
+                message: errors.join('；'),
+              })
+            } else {
+              const reagent = reagents.find(r => r.name === rowData['试剂名称'])!
+              const initialQty = Number(rowData['初始数量'])
+              const newBatch: ReagentBatch = {
+                id: generateId(),
+                reagentId: reagent.id,
+                reagentName: reagent.name,
+                batchNumber: String(rowData['批次号']).trim(),
+                productionDate: String(rowData['生产日期']),
+                expiryDate: String(rowData['有效期至']),
+                initialQuantity: initialQty,
+                remainingQuantity: initialQty,
+                unit: reagent.unit,
+                storageLocation: String(rowData['库位']).trim(),
+                receivedDate: rowData['入库日期'] || now,
+                status: 'normal',
+                remark: rowData['备注'] || '',
+              }
+              const updatedBatch = updateBatchStatus(newBatch)
+              batches.unshift(updatedBatch)
+              result.success++
+              result.items.push({
+                row: rowNum,
+                success: true,
+                message: '导入成功',
+                data: updatedBatch,
+              })
+            }
+          })
+
+          saveBatchesToStorage(batches)
+          resolve(result)
+        } catch (err: any) {
+          reject(new Error('文件解析失败：' + err.message))
+        }
+      }
+      reader.onerror = () => reject(new Error('文件读取失败'))
+      reader.readAsText(file, 'UTF-8')
+    } catch (err: any) {
+      reject(err)
+    }
+  })
+}
+
+export function downloadBatchTemplate(): void {
+  const headers = ['试剂名称', '批次号', '生产日期', '有效期至', '初始数量', '库位', '入库日期', '备注']
+  const sampleRow = ['牛血清白蛋白 BSA', 'BSA20250101', '2025-01-01', '2026-12-31', '100', 'A-01-03', '2025-06-01', '首批入库']
+
+  const csvContent = [
+    headers.join(','),
+    sampleRow.map(v => `"${v}"`).join(','),
+  ].join('\n')
+
+  const BOM = '\uFEFF'
+  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+  const link = document.createElement('a')
+  const url = URL.createObjectURL(blob)
+  link.setAttribute('href', url)
+  link.setAttribute('download', '批次导入模板.csv')
+  link.style.visibility = 'hidden'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}
+
+export interface BatchFilterParams {
+  keyword?: string
+  reagentId?: string
+  status?: string
+  storageLocation?: string
+  storageCondition?: string
+  operator?: string
+  productionDateStart?: string
+  productionDateEnd?: string
+  expiryDateStart?: string
+  expiryDateEnd?: string
+  receivedDateStart?: string
+  receivedDateEnd?: string
+}
+
+export async function mockExportAllBatches(filters?: BatchFilterParams): Promise<ReagentBatch[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      let batches = getBatchesFromStorage().map(updateBatchStatus)
+
+      if (filters) {
+        const {
+          keyword,
+          reagentId,
+          status,
+          storageLocation,
+          productionDateStart,
+          productionDateEnd,
+          expiryDateStart,
+          expiryDateEnd,
+          receivedDateStart,
+          receivedDateEnd,
+        } = filters
+
+        if (keyword) {
+          const kw = keyword.toLowerCase()
+          batches = batches.filter(
+            (b) =>
+              b.batchNumber.toLowerCase().includes(kw) ||
+              b.reagentName?.toLowerCase().includes(kw) ||
+              b.storageLocation.toLowerCase().includes(kw)
+          )
+        }
+
+        if (reagentId) {
+          batches = batches.filter((b) => b.reagentId === reagentId)
+        }
+
+        if (status) {
+          batches = batches.filter((b) => b.status === status)
+        }
+
+        if (storageLocation) {
+          const sl = storageLocation.toLowerCase()
+          batches = batches.filter((b) => b.storageLocation.toLowerCase().includes(sl))
+        }
+
+        if (productionDateStart) {
+          const start = new Date(productionDateStart).getTime()
+          batches = batches.filter((b) => new Date(b.productionDate).getTime() >= start)
+        }
+
+        if (productionDateEnd) {
+          const end = new Date(productionDateEnd).getTime() + 24 * 60 * 60 * 1000
+          batches = batches.filter((b) => new Date(b.productionDate).getTime() < end)
+        }
+
+        if (expiryDateStart) {
+          const start = new Date(expiryDateStart).getTime()
+          batches = batches.filter((b) => new Date(b.expiryDate).getTime() >= start)
+        }
+
+        if (expiryDateEnd) {
+          const end = new Date(expiryDateEnd).getTime() + 24 * 60 * 60 * 1000
+          batches = batches.filter((b) => new Date(b.expiryDate).getTime() < end)
+        }
+
+        if (receivedDateStart) {
+          const start = new Date(receivedDateStart).getTime()
+          batches = batches.filter((b) => new Date(b.receivedDate).getTime() >= start)
+        }
+
+        if (receivedDateEnd) {
+          const end = new Date(receivedDateEnd).getTime() + 24 * 60 * 60 * 1000
+          batches = batches.filter((b) => new Date(b.receivedDate).getTime() < end)
+        }
+      }
+
+      batches.sort((a, b) => new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime())
+      resolve(batches)
+    }, 300)
+  })
+}

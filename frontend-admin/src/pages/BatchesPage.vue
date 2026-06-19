@@ -39,8 +39,26 @@ import {
   mockCreateBatch,
   mockBatchOutbound,
   mockGetBatch,
+  mockBatchDeleteBatches,
+  mockBatchUpdateBatchLocation,
+  mockBatchUpdateBatchStatus,
+  mockBatchImportBatches,
+  downloadBatchTemplate,
+  mockExportAllBatches,
 } from '@/mock/batches'
 import { mockGetAllReagents } from '@/mock/reagents'
+import type { ImportResult } from '@/components/BatchImportDialog.vue'
+import BatchOperationBar from '@/components/BatchOperationBar.vue'
+import BatchImportDialog from '@/components/BatchImportDialog.vue'
+import BatchEditDialog from '@/components/BatchEditDialog.vue'
+import type { BatchEditField } from '@/components/BatchEditDialog.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import {
+  Trash2,
+  MapPin,
+  Snowflake,
+  Sun,
+} from 'lucide-vue-next'
 import type {
   ReagentBatch,
   BatchOperation,
@@ -145,6 +163,26 @@ const currentOperationType = ref<BatchOperationType | null>(null)
 
 const openMoreMenuBatchId = ref<string | null>(null)
 
+const selectedIds = ref<string[]>([])
+const showImportDialog = ref(false)
+const importLoading = ref(false)
+const importResult = ref<ImportResult | null>(null)
+
+const showBatchDeleteConfirm = ref(false)
+const batchDeleteLoading = ref(false)
+
+const showBatchEditDialog = ref(false)
+const batchEditType = ref<'location'>('location')
+const batchEditFields = ref<BatchEditField[]>([])
+const batchEditLoading = ref(false)
+
+const batchActions = computed(() => [
+  { key: 'location', label: '批量修改库位', icon: MapPin, type: 'default', permission: permission.canEditBatch },
+  { key: 'freeze', label: '批量冻结', icon: Snowflake, type: 'default', permission: permission.canEditBatch },
+  { key: 'unfreeze', label: '批量解冻', icon: Sun, type: 'default', permission: permission.canEditBatch },
+  { key: 'delete', label: '批量删除', icon: Trash2, type: 'danger', permission: permission.canDeleteBatch },
+])
+
 const fetchData = async () => {
   loading.value = true
   try {
@@ -224,6 +262,165 @@ const handleExport = () => {
 
 const handleAction = () => {
   showCreateModal.value = true
+}
+
+const toggleSelect = (id: string) => {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx > -1) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
+}
+
+const toggleSelectAll = () => {
+  if (selectedIds.value.length === data.value?.list.length) {
+    selectedIds.value = []
+  } else {
+    selectedIds.value = data.value?.list.map(b => b.id) || []
+  }
+}
+
+const clearSelection = () => {
+  selectedIds.value = []
+}
+
+const handleBatchAction = (action: string) => {
+  if (selectedIds.value.length === 0) {
+    alert('请先选择要操作的记录')
+    return
+  }
+  switch (action) {
+    case 'delete':
+      showBatchDeleteConfirm.value = true
+      break
+    case 'location':
+      batchEditType.value = 'location'
+      batchEditFields.value = [
+        {
+          key: 'storageLocation',
+          label: '库位',
+          type: 'input',
+          required: true,
+          placeholder: '请输入库位',
+        },
+      ]
+      showBatchEditDialog.value = true
+      break
+    case 'freeze':
+      handleBatchStatusUpdate('freeze')
+      break
+    case 'unfreeze':
+      handleBatchStatusUpdate('unfreeze')
+      break
+  }
+}
+
+const handleBatchDelete = async () => {
+  batchDeleteLoading.value = true
+  try {
+    await mockBatchDeleteBatches(selectedIds.value)
+    showBatchDeleteConfirm.value = false
+    clearSelection()
+    if (data.value?.list && selectedIds.value.length >= data.value.list.length && pagination.page > 1) {
+      pagination.page--
+    }
+    fetchData()
+    alert('删除成功')
+  } catch (e: any) {
+    alert(e.message || '删除失败')
+  } finally {
+    batchDeleteLoading.value = false
+  }
+}
+
+const handleBatchEditConfirm = async (values: Record<string, any>) => {
+  batchEditLoading.value = true
+  try {
+    if (batchEditType.value === 'location') {
+      await mockBatchUpdateBatchLocation(selectedIds.value, values.storageLocation)
+    }
+    showBatchEditDialog.value = false
+    clearSelection()
+    fetchData()
+    alert('修改成功')
+  } catch (e: any) {
+    alert(e.message || '修改失败')
+  } finally {
+    batchEditLoading.value = false
+  }
+}
+
+const handleBatchStatusUpdate = async (status: 'freeze' | 'unfreeze') => {
+  if (!confirm(`确定要批量${status === 'freeze' ? '冻结' : '解冻'}选中的 ${selectedIds.value.length} 条记录吗？`)) {
+    return
+  }
+  try {
+    await mockBatchUpdateBatchStatus(selectedIds.value, status)
+    clearSelection()
+    fetchData()
+    alert('操作成功')
+  } catch (e: any) {
+    alert(e.message || '操作失败')
+  }
+}
+
+const handleBatchImport = async (file: File) => {
+  importLoading.value = true
+  importResult.value = null
+  try {
+    const result = await mockBatchImportBatches(file)
+    importResult.value = result
+    fetchData()
+  } catch (e: any) {
+    alert(e.message || '导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+const handleDownloadTemplate = () => {
+  downloadBatchTemplate()
+}
+
+const handleExport = async () => {
+  try {
+    const exportFilters = {
+      keyword: filters.value.keyword,
+      status: filters.value.status,
+      reagentId: filters.value.reagentId,
+      storageLocation: filters.value.storageLocation,
+      storageCondition: filters.value.storageCondition,
+      operator: filters.value.operator,
+      receivedDateStart: filters.value.receivedDate?.[0] || '',
+      receivedDateEnd: filters.value.receivedDate?.[1] || '',
+      productionDateStart: filters.value.productionDate?.[0] || '',
+      productionDateEnd: filters.value.productionDate?.[1] || '',
+      expiryDateStart: filters.value.expiryDate?.[0] || '',
+      expiryDateEnd: filters.value.expiryDate?.[1] || '',
+    }
+    const allData = await mockExportAllBatches(exportFilters)
+    if (!allData || allData.length === 0) {
+      alert('暂无数据可导出')
+      return
+    }
+    const columns = [
+      { key: 'batchNumber', label: '批次号' },
+      { key: 'reagentName', label: '试剂名称' },
+      { key: 'status', label: '状态', formatter: (v: string) => batchStatusLabels[v as keyof typeof batchStatusLabels] || v },
+      { key: 'currentQuantity', label: '当前数量' },
+      { key: 'initialQuantity', label: '初始数量' },
+      { key: 'productionDate', label: '生产日期' },
+      { key: 'expiryDate', label: '有效期' },
+      { key: 'receivedDate', label: '入库日期' },
+      { key: 'storageLocation', label: '库位' },
+      { key: 'operator', label: '操作人' },
+      { key: 'remark', label: '备注' },
+    ]
+    exportToCsv(allData, columns, `批次列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
+  } catch (e: any) {
+    alert(e.message || '导出失败')
+  }
 }
 
 const handlePageChange = (page: number) => {
@@ -453,16 +650,30 @@ onMounted(() => {
       v-model="filters"
       :filter-fields="dynamicFilterFields"
       :saved-filters="savedFilters"
-      :show-export="permission.canCreateBatch"
       :action-button-text="permission.canCreateBatch ? '录入批次' : undefined"
       keyword-placeholder="搜索批次号、试剂名称、CAS号、厂家、货号、库位..."
       @search="handleSearch"
       @reset="handleReset"
-      @export="handleExport"
       @action="handleAction"
       @save-filter="handleSaveFilter"
       @apply-filter="handleApplyFilter"
       @delete-filter="handleDeleteFilter"
+    />
+
+    <BatchOperationBar
+      :selected-count="selectedIds.length"
+      :total-count="data?.total || 0"
+      :actions="batchActions"
+      :show-import="permission.canCreateBatch"
+      :show-export="permission.canViewBatch"
+      :show-template="permission.canCreateBatch"
+      :import-permission="permission.canCreateBatch"
+      :export-permission="permission.canViewBatch"
+      @action="handleBatchAction"
+      @import="showImportDialog = true; importResult = null"
+      @export="handleExport"
+      @download-template="handleDownloadTemplate"
+      @clear-selection="clearSelection"
     />
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -495,6 +706,15 @@ onMounted(() => {
           <table class="w-full">
             <thead class="bg-gray-50 border-b border-gray-100">
               <tr>
+                <th class="w-12 px-6 py-4 text-left">
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.length > 0 && selectedIds.length === data?.list.length"
+                    :indeterminate="selectedIds.length > 0 && selectedIds.length < (data?.list.length || 0)"
+                    class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    @change="toggleSelectAll"
+                  >
+                </th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   试剂名称
                 </th>
@@ -522,14 +742,25 @@ onMounted(() => {
               <tr
                 v-for="batch in data?.list"
                 :key="batch.id"
-                class="hover:bg-gray-50 transition-colors cursor-pointer"
-                :class="{
-                  'bg-warning-50/30': batch.status === 'warning',
-                  'bg-danger-50/20': batch.status === 'expired',
-                  'bg-info-50/20': batch.status === 'frozen',
-                }"
+                :class="[
+                  'hover:bg-gray-50 transition-colors cursor-pointer',
+                  selectedIds.includes(batch.id) ? 'bg-primary-50/50' : '',
+                  {
+                    'bg-warning-50/30': batch.status === 'warning',
+                    'bg-danger-50/20': batch.status === 'expired',
+                    'bg-info-50/20': batch.status === 'frozen',
+                  }
+                ]"
                 @click="openDetailModal(batch.id)"
               >
+                <td class="w-12 px-6 py-4" @click.stop>
+                  <input
+                    type="checkbox"
+                    :checked="selectedIds.includes(batch.id)"
+                    class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 cursor-pointer"
+                    @change="toggleSelect(batch.id)"
+                  >
+                </td>
                 <td class="px-6 py-4">
                   <div class="font-medium text-gray-900">
                     {{ batch.reagentName }}
@@ -1312,6 +1543,34 @@ onMounted(() => {
       :batch="operationBatch"
       :operation-type="currentOperationType"
       @success="handleOperationSuccess"
+    />
+
+    <BatchImportDialog
+      v-model:visible="showImportDialog"
+      title="批量导入批次"
+      :loading="importLoading"
+      :result="importResult"
+      accept=".csv"
+      @import="handleBatchImport"
+      @download-template="handleDownloadTemplate"
+    />
+
+    <BatchEditDialog
+      v-model:visible="showBatchEditDialog"
+      title="批量修改库位"
+      :fields="batchEditFields"
+      :selected-count="selectedIds.length"
+      :loading="batchEditLoading"
+      @confirm="handleBatchEditConfirm"
+    />
+
+    <ConfirmDialog
+      v-model:visible="showBatchDeleteConfirm"
+      title="确认删除"
+      :message="`确定要删除选中的 ${selectedIds.length} 条批次吗？删除后将无法恢复。`"
+      confirm-text="确认删除"
+      type="danger"
+      @confirm="handleBatchDelete"
     />
   </div>
 </template>
