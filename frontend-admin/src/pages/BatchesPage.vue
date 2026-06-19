@@ -17,6 +17,17 @@ import {
   Clock,
   User,
   FileText,
+  MoreHorizontal,
+  ArrowLeftRight,
+  PlusCircle,
+  MinusCircle,
+  Trash2,
+  Snowflake,
+  Sun,
+  PackageOpen,
+  ClipboardCheck,
+  CalendarClock,
+  ChevronDown,
 } from 'lucide-vue-next'
 import {
   mockGetBatches,
@@ -30,11 +41,19 @@ import type {
   BatchOperation,
   BatchFormData,
   OutboundFormData,
+  BatchOperationType,
+} from '@/types/batch'
+import {
+  batchStatusLabels,
+  batchStatusColors,
+  operationTypeLabels,
+  operationTypeColors,
+  operationTypeConfigs,
 } from '@/types/batch'
 import type { PageResult } from '@/types/common'
 import type { Reagent } from '@/types/reagent'
-import { batchStatusLabels, batchStatusColors } from '@/types/batch'
 import { formatDate, getExpiryDays } from '@/utils/date'
+import BatchOperationDialog from '@/components/BatchOperationDialog.vue'
 
 const route = useRoute()
 const loading = ref(false)
@@ -76,6 +95,12 @@ const outboundForm = reactive<OutboundFormData>({
   purpose: '',
 })
 const outboundBatchId = ref('')
+
+const showOperationDialog = ref(false)
+const operationBatch = ref<ReagentBatch | null>(null)
+const currentOperationType = ref<BatchOperationType | null>(null)
+
+const openMoreMenuBatchId = ref<string | null>(null)
 
 const fetchData = async () => {
   loading.value = true
@@ -158,7 +183,7 @@ const handleCreateSubmit = async () => {
     alert('请输入存放位置')
     return
   }
-  
+
   createLoading.value = true
   try {
     await mockCreateBatch(createForm)
@@ -182,6 +207,13 @@ const openDetailModal = async (id: string) => {
   }
 }
 
+const refreshDetailModal = async () => {
+  if (currentBatch.value) {
+    const batch = await mockGetBatch(currentBatch.value.id)
+    currentBatch.value = batch
+  }
+}
+
 const openOutboundModal = (id: string) => {
   outboundBatchId.value = id
   outboundForm.quantity = 0
@@ -198,20 +230,51 @@ const handleOutboundSubmit = async () => {
     alert('请输入用途')
     return
   }
-  
+
   outboundLoading.value = true
   try {
     await mockBatchOutbound(outboundBatchId.value, outboundForm)
     showOutboundModal.value = false
     fetchData()
     if (currentBatch.value && currentBatch.value.id === outboundBatchId.value) {
-      const batch = await mockGetBatch(outboundBatchId.value)
-      currentBatch.value = batch
+      refreshDetailModal()
     }
   } catch (e: any) {
     alert(e.message || '出库失败')
   } finally {
     outboundLoading.value = false
+  }
+}
+
+const toggleMoreMenu = (batchId: string, event: MouseEvent) => {
+  event.stopPropagation()
+  openMoreMenuBatchId.value = openMoreMenuBatchId.value === batchId ? null : batchId
+}
+
+const closeMoreMenu = () => {
+  openMoreMenuBatchId.value = null
+}
+
+const isOperationDisabled = (batch: ReagentBatch, opType: BatchOperationType): boolean => {
+  const config = operationTypeConfigs.find((c) => c.type === opType)
+  if (!config) return true
+  return config.disabledStatuses.includes(batch.status)
+}
+
+const openOperation = (batch: ReagentBatch, opType: BatchOperationType) => {
+  if (isOperationDisabled(batch, opType)) {
+    return
+  }
+  operationBatch.value = batch
+  currentOperationType.value = opType
+  showOperationDialog.value = true
+  openMoreMenuBatchId.value = null
+}
+
+const handleOperationSuccess = () => {
+  fetchData()
+  if (currentBatch.value && operationBatch.value && currentBatch.value.id === operationBatch.value.id) {
+    refreshDetailModal()
   }
 }
 
@@ -237,6 +300,42 @@ const filterByReagent = (reagentId: string) => {
   fetchData()
 }
 
+const getOperationIconComponent = (iconName: string) => {
+  const map: Record<string, any> = {
+    ArrowUpCircle,
+    ArrowDownCircle,
+    ArrowLeftRight,
+    PlusCircle,
+    MinusCircle,
+    Trash2,
+    Snowflake,
+    Sun,
+    PackageOpen,
+    ClipboardCheck,
+    CalendarClock,
+  }
+  return map[iconName] || Package
+}
+
+const getQuantityChangeText = (op: BatchOperation) => {
+  if (['freeze', 'unfreeze', 'open', 'retest', 'extend_retest'].includes(op.type)) {
+    return '—'
+  }
+  const diff = op.afterQuantity - op.beforeQuantity
+  const sign = diff > 0 ? '+' : ''
+  return `${sign}${diff}`
+}
+
+const getQuantityChangeColor = (op: BatchOperation) => {
+  if (['freeze', 'unfreeze', 'open', 'retest', 'extend_retest'].includes(op.type)) {
+    return 'text-gray-400'
+  }
+  const diff = op.afterQuantity - op.beforeQuantity
+  if (diff > 0) return 'text-success-600'
+  if (diff < 0) return 'text-danger-600'
+  return 'text-gray-500'
+}
+
 watch(
   () => route.query.reagentId,
   (val) => {
@@ -251,6 +350,8 @@ onMounted(() => {
   fetchReagents().then(() => {
     fetchData()
   })
+
+  document.addEventListener('click', closeMoreMenu)
 })
 </script>
 
@@ -272,7 +373,7 @@ onMounted(() => {
             >
           </div>
         </div>
-        
+
         <select
           v-model="searchForm.reagentId"
           class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white min-w-[180px]"
@@ -288,7 +389,7 @@ onMounted(() => {
             {{ r.name }}
           </option>
         </select>
-        
+
         <select
           v-model="searchForm.status"
           class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
@@ -300,30 +401,33 @@ onMounted(() => {
             正常
           </option>
           <option value="warning">
-            即将过期
+            近效期
           </option>
           <option value="expired">
             已过期
+          </option>
+          <option value="frozen">
+            已冻结
           </option>
           <option value="exhausted">
             已耗尽
           </option>
         </select>
-        
+
         <button
           class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
           @click="handleSearch"
         >
           搜索
         </button>
-        
+
         <button
           class="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
           @click="handleReset"
         >
           重置
         </button>
-        
+
         <button
           class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all flex items-center gap-2 shadow-md shadow-primary-500/20"
           @click="openCreateModal"
@@ -346,7 +450,7 @@ onMounted(() => {
           {{ r.name }}
         </div>
         <div class="text-lg font-semibold text-gray-800">
-          {{ data?.list.filter(b => b.reagentId === r.id).length || 0 }} 批次
+          {{ data?.list.filter((b) => b.reagentId === r.id).length || 0 }} 批次
         </div>
       </div>
     </div>
@@ -358,7 +462,7 @@ onMounted(() => {
       >
         <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
       </div>
-      
+
       <div v-else>
         <div class="overflow-x-auto">
           <table class="w-full">
@@ -395,6 +499,7 @@ onMounted(() => {
                 :class="{
                   'bg-warning-50/30': batch.status === 'warning',
                   'bg-danger-50/20': batch.status === 'expired',
+                  'bg-info-50/20': batch.status === 'frozen',
                 }"
                 @click="openDetailModal(batch.id)"
               >
@@ -415,6 +520,7 @@ onMounted(() => {
                     :class="{
                       'text-danger-600': batch.status === 'expired',
                       'text-warning-600': batch.status === 'warning',
+                      'text-info-600': batch.status === 'frozen',
                       'text-gray-400': batch.status === 'normal' || batch.status === 'exhausted',
                     }"
                   >
@@ -422,7 +528,11 @@ onMounted(() => {
                       v-if="batch.status === 'warning' || batch.status === 'expired'"
                       class="w-3 h-3"
                     />
-                    {{ getDaysLabel(batch) }}
+                    <Snowflake
+                      v-else-if="batch.status === 'frozen'"
+                      class="w-3 h-3"
+                    />
+                    {{ batch.status === 'frozen' ? '已冻结' : getDaysLabel(batch) }}
                   </div>
                 </td>
                 <td class="px-6 py-4">
@@ -473,20 +583,52 @@ onMounted(() => {
                       <Eye class="w-4 h-4" />
                     </button>
                     <button
-                      v-if="batch.status !== 'expired' && batch.status !== 'exhausted'"
+                      v-if="batch.status !== 'expired' && batch.status !== 'exhausted' && batch.status !== 'frozen'"
                       class="p-1.5 text-success-600 hover:bg-success-50 rounded transition-colors"
                       title="出库"
                       @click="openOutboundModal(batch.id)"
                     >
                       <ArrowDownCircle class="w-4 h-4" />
                     </button>
+                    <div class="relative">
+                      <button
+                        class="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                        title="更多操作"
+                        @click="toggleMoreMenu(batch.id, $event)"
+                      >
+                        <MoreHorizontal class="w-4 h-4" />
+                      </button>
+                      <div
+                        v-if="openMoreMenuBatchId === batch.id"
+                        class="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-30"
+                      >
+                        <button
+                          v-for="op in operationTypeConfigs"
+                          :key="op.type"
+                          class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors"
+                          :class="
+                            isOperationDisabled(batch, op.type)
+                              ? 'text-gray-300 cursor-not-allowed'
+                              : 'text-gray-700 hover:bg-gray-50'
+                          "
+                          :disabled="isOperationDisabled(batch, op.type)"
+                          @click="openOperation(batch, op.type)"
+                        >
+                          <component
+                            :is="getOperationIconComponent(op.icon)"
+                            class="w-4 h-4"
+                          />
+                          {{ op.label }}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
-        
+
         <div
           v-if="data?.list.length === 0"
           class="p-16 text-center"
@@ -498,7 +640,7 @@ onMounted(() => {
             暂无批次数据
           </p>
         </div>
-        
+
         <div
           v-if="data && data.total > 0"
           class="px-6 py-4 border-t border-gray-100 flex items-center justify-between"
@@ -556,7 +698,7 @@ onMounted(() => {
             <X class="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        
+
         <div class="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -578,7 +720,7 @@ onMounted(() => {
               </option>
             </select>
           </div>
-          
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               批次号 <span class="text-red-500">*</span>
@@ -590,7 +732,7 @@ onMounted(() => {
               placeholder="如：BSA20250101"
             >
           </div>
-          
+
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -613,7 +755,7 @@ onMounted(() => {
               >
             </div>
           </div>
-          
+
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -639,7 +781,7 @@ onMounted(() => {
               >
             </div>
           </div>
-          
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               存放位置 <span class="text-red-500">*</span>
@@ -651,7 +793,7 @@ onMounted(() => {
               placeholder="如：A-01-03"
             >
           </div>
-          
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               备注
@@ -664,7 +806,7 @@ onMounted(() => {
             />
           </div>
         </div>
-        
+
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
@@ -709,14 +851,14 @@ onMounted(() => {
             <X class="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        
+
         <div
           v-if="detailLoading"
           class="flex-1 p-12 flex items-center justify-center"
         >
           <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />
         </div>
-        
+
         <div
           v-else-if="currentBatch"
           class="flex-1 overflow-y-auto"
@@ -740,7 +882,7 @@ onMounted(() => {
                 </div>
               </div>
             </div>
-            
+
             <div class="grid grid-cols-3 gap-4">
               <div class="p-4 bg-gray-50 rounded-xl">
                 <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
@@ -753,7 +895,15 @@ onMounted(() => {
               </div>
               <div
                 class="p-4 rounded-xl"
-                :class="currentBatch.status === 'expired' ? 'bg-danger-50' : currentBatch.status === 'warning' ? 'bg-warning-50' : 'bg-gray-50'"
+                :class="
+                  currentBatch.status === 'expired'
+                    ? 'bg-danger-50'
+                    : currentBatch.status === 'warning'
+                      ? 'bg-warning-50'
+                      : currentBatch.status === 'frozen'
+                        ? 'bg-info-50'
+                        : 'bg-gray-50'
+                "
               >
                 <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
                   <Clock class="w-3 h-3" />
@@ -761,15 +911,31 @@ onMounted(() => {
                 </div>
                 <div
                   class="font-medium"
-                  :class="currentBatch.status === 'expired' ? 'text-danger-600' : currentBatch.status === 'warning' ? 'text-warning-600' : 'text-gray-800'"
+                  :class="
+                    currentBatch.status === 'expired'
+                      ? 'text-danger-600'
+                      : currentBatch.status === 'warning'
+                        ? 'text-warning-600'
+                        : currentBatch.status === 'frozen'
+                          ? 'text-info-600'
+                          : 'text-gray-800'
+                  "
                 >
                   {{ formatDate(currentBatch.expiryDate) }}
                 </div>
                 <div
                   class="text-xs mt-0.5"
-                  :class="currentBatch.status === 'expired' ? 'text-danger-500' : currentBatch.status === 'warning' ? 'text-warning-500' : 'text-gray-400'"
+                  :class="
+                    currentBatch.status === 'expired'
+                      ? 'text-danger-500'
+                      : currentBatch.status === 'warning'
+                        ? 'text-warning-500'
+                        : currentBatch.status === 'frozen'
+                          ? 'text-info-500'
+                          : 'text-gray-400'
+                  "
                 >
-                  {{ getDaysLabel(currentBatch) }}
+                  {{ currentBatch.status === 'frozen' ? '已冻结' : getDaysLabel(currentBatch) }}
                 </div>
               </div>
               <div class="p-4 bg-gray-50 rounded-xl">
@@ -782,8 +948,45 @@ onMounted(() => {
                 </div>
               </div>
             </div>
-            
-            <div class="p-4 bg-gradient-to-r from-primary-50 to-success-50 rounded-xl">
+
+            <div
+              v-if="currentBatch.openedAt || currentBatch.lastRetestAt"
+              class="grid grid-cols-2 gap-4"
+            >
+              <div
+                v-if="currentBatch.openedAt"
+                class="p-4 bg-gray-50 rounded-xl"
+              >
+                <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                  <PackageOpen class="w-3 h-3" />
+                  开封时间
+                </div>
+                <div class="font-medium text-gray-800">
+                  {{ formatDate(currentBatch.openedAt, 'YYYY-MM-DD HH:mm') }}
+                </div>
+              </div>
+              <div
+                v-if="currentBatch.lastRetestAt"
+                class="p-4 bg-gray-50 rounded-xl"
+              >
+                <div class="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                  <ClipboardCheck class="w-3 h-3" />
+                  最后复测
+                </div>
+                <div class="font-medium text-gray-800">
+                  {{ formatDate(currentBatch.lastRetestAt, 'YYYY-MM-DD HH:mm') }}
+                </div>
+              </div>
+            </div>
+
+            <div
+              class="p-4 rounded-xl"
+              :class="
+                currentBatch.status === 'frozen'
+                  ? 'bg-gradient-to-r from-info-50 to-primary-50'
+                  : 'bg-gradient-to-r from-primary-50 to-success-50'
+              "
+            >
               <div class="flex items-center justify-between mb-3">
                 <span class="text-sm font-medium text-gray-700">库存情况</span>
                 <span
@@ -802,7 +1005,8 @@ onMounted(() => {
                   class="h-full rounded-full transition-all"
                   :class="{
                     'bg-success-500': 100 - getUsagePercentage(currentBatch) > 50,
-                    'bg-warning-500': 100 - getUsagePercentage(currentBatch) > 20 && 100 - getUsagePercentage(currentBatch) <= 50,
+                    'bg-warning-500':
+                      100 - getUsagePercentage(currentBatch) > 20 && 100 - getUsagePercentage(currentBatch) <= 50,
                     'bg-danger-500': 100 - getUsagePercentage(currentBatch) <= 20,
                   }"
                   :style="{ width: `${100 - getUsagePercentage(currentBatch)}%` }"
@@ -813,7 +1017,7 @@ onMounted(() => {
                 <span>剩余 {{ (100 - getUsagePercentage(currentBatch)).toFixed(1) }}%</span>
               </div>
             </div>
-            
+
             <div
               v-if="currentBatch.remark"
               class="p-4 bg-gray-50 rounded-xl"
@@ -826,25 +1030,63 @@ onMounted(() => {
                 {{ currentBatch.remark }}
               </div>
             </div>
-            
+
             <div>
               <div class="flex items-center justify-between mb-4">
                 <h4 class="font-semibold text-gray-800">
-                  出入库记录
+                  操作记录（生命周期）
                 </h4>
-                <button
-                  v-if="currentBatch.status !== 'expired' && currentBatch.status !== 'exhausted'"
-                  class="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors flex items-center gap-1"
-                  @click="openOutboundModal(currentBatch.id)"
-                >
-                  <ArrowDownCircle class="w-4 h-4" />
-                  出库
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    v-if="
+                      currentBatch.status !== 'expired' &&
+                      currentBatch.status !== 'exhausted' &&
+                      currentBatch.status !== 'frozen'
+                    "
+                    class="px-3 py-1.5 text-sm bg-success-600 hover:bg-success-700 text-white rounded-lg transition-colors flex items-center gap-1"
+                    @click="openOutboundModal(currentBatch.id)"
+                  >
+                    <ArrowDownCircle class="w-4 h-4" />
+                    出库
+                  </button>
+                  <div class="relative">
+                    <button
+                      class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-1"
+                      @click="toggleMoreMenu(currentBatch.id, $event)"
+                    >
+                      更多操作
+                      <ChevronDown class="w-4 h-4" />
+                    </button>
+                    <div
+                      v-if="openMoreMenuBatchId === currentBatch.id"
+                      class="absolute right-0 top-full mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-30"
+                    >
+                      <button
+                        v-for="op in operationTypeConfigs"
+                        :key="op.type"
+                        class="w-full flex items-center gap-2 px-3 py-2 text-sm text-left transition-colors"
+                        :class="
+                          isOperationDisabled(currentBatch, op.type)
+                            ? 'text-gray-300 cursor-not-allowed'
+                            : 'text-gray-700 hover:bg-gray-50'
+                        "
+                        :disabled="isOperationDisabled(currentBatch, op.type)"
+                        @click="openOperation(currentBatch, op.type)"
+                      >
+                        <component
+                          :is="getOperationIconComponent(op.icon)"
+                          class="w-4 h-4"
+                        />
+                        {{ op.label }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-              
+
               <div class="relative">
                 <div class="absolute left-4 top-2 bottom-2 w-0.5 bg-gray-200" />
-                
+
                 <div class="space-y-4">
                   <div
                     v-for="op in currentBatch.operations"
@@ -853,55 +1095,105 @@ onMounted(() => {
                   >
                     <div
                       class="absolute left-2 top-1 w-5 h-5 rounded-full border-2 border-white shadow flex items-center justify-center"
-                      :class="op.type === 'in' ? 'bg-success-500' : 'bg-primary-500'"
+                      :class="{
+                        'bg-success-500': ['in', 'return', 'stock_in'].includes(op.type),
+                        'bg-danger-500': ['out', 'scrap', 'stock_out'].includes(op.type),
+                        'bg-info-500': ['transfer', 'freeze', 'unfreeze'].includes(op.type),
+                        'bg-neutral-500': ['open', 'retest', 'extend_retest'].includes(op.type),
+                      }"
                     >
                       <ArrowUpCircle
-                        v-if="op.type === 'in'"
+                        v-if="['in', 'return', 'stock_in'].includes(op.type)"
                         class="w-3 h-3 text-white"
                       />
                       <ArrowDownCircle
-                        v-else
+                        v-else-if="['out', 'scrap', 'stock_out'].includes(op.type)"
+                        class="w-3 h-3 text-white"
+                      />
+                      <ArrowLeftRight
+                        v-else-if="op.type === 'transfer'"
+                        class="w-3 h-3 text-white"
+                      />
+                      <Snowflake
+                        v-else-if="op.type === 'freeze'"
+                        class="w-3 h-3 text-white"
+                      />
+                      <Sun
+                        v-else-if="op.type === 'unfreeze'"
+                        class="w-3 h-3 text-white"
+                      />
+                      <PackageOpen
+                        v-else-if="op.type === 'open'"
+                        class="w-3 h-3 text-white"
+                      />
+                      <ClipboardCheck
+                        v-else-if="op.type === 'retest' || op.type === 'extend_retest'"
                         class="w-3 h-3 text-white"
                       />
                     </div>
-                    
+
                     <div class="bg-gray-50 rounded-lg p-3">
                       <div class="flex items-center justify-between mb-2">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                           <span
                             class="text-xs font-medium px-2 py-0.5 rounded"
-                            :class="op.type === 'in' ? 'bg-success-100 text-success-700' : 'bg-primary-100 text-primary-700'"
+                            :class="operationTypeColors[op.type]"
                           >
-                            {{ op.type === 'in' ? '入库' : '出库' }}
+                            {{ operationTypeLabels[op.type] }}
                           </span>
-                          <span class="text-sm font-semibold text-gray-800">
-                            {{ op.type === 'in' ? '+' : '-' }}{{ op.quantity }}
+                          <span
+                            v-if="op.quantity > 0 || !['freeze', 'unfreeze', 'open', 'retest', 'extend_retest'].includes(op.type)"
+                            class="text-sm font-semibold"
+                            :class="getQuantityChangeColor(op)"
+                          >
+                            {{ getQuantityChangeText(op) }}
+                          </span>
+                          <span
+                            v-if="op.targetLocation"
+                            class="text-xs text-gray-500"
+                          >
+                            → {{ op.targetLocation }}
                           </span>
                         </div>
                         <span class="text-xs text-gray-400">
                           {{ formatDate(op.createdAt, 'MM-DD HH:mm') }}
                         </span>
                       </div>
-                      <div class="flex items-center gap-2 text-xs text-gray-500">
+                      <div class="flex items-center gap-2 text-xs text-gray-500 mb-1.5 flex-wrap">
                         <User class="w-3 h-3" />
                         <span>{{ op.operatorName }}</span>
                         <span v-if="op.purpose">· {{ op.purpose }}</span>
+                        <span v-if="op.reason">· 原因：{{ op.reason }}</span>
+                      </div>
+                      <div class="text-xs text-gray-400 flex items-center gap-3 flex-wrap">
+                        <span>操作前：{{ op.beforeQuantity }}</span>
+                        <span>→</span>
+                        <span>操作后：{{ op.afterQuantity }}</span>
+                        <span v-if="op.newExpiryDate">
+                          · 新有效期：{{ formatDate(op.newExpiryDate) }}
+                        </span>
+                      </div>
+                      <div
+                        v-if="op.remark"
+                        class="text-xs text-gray-500 mt-1.5 pt-1.5 border-t border-gray-200"
+                      >
+                        备注：{{ op.remark }}
                       </div>
                     </div>
                   </div>
                 </div>
-                
+
                 <div
                   v-if="currentBatch.operations.length === 0"
                   class="text-center py-8 text-gray-400 text-sm"
                 >
-                  暂无出入库记录
+                  暂无操作记录
                 </div>
               </div>
             </div>
           </div>
         </div>
-        
+
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50 flex-shrink-0">
           <button
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
@@ -930,7 +1222,7 @@ onMounted(() => {
             <X class="w-5 h-5 text-gray-400" />
           </button>
         </div>
-        
+
         <div class="p-6 space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
@@ -945,7 +1237,7 @@ onMounted(() => {
               placeholder="请输入出库数量"
             >
           </div>
-          
+
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               用途 <span class="text-red-500">*</span>
@@ -958,7 +1250,7 @@ onMounted(() => {
             />
           </div>
         </div>
-        
+
         <div class="flex items-center justify-end gap-3 px-6 py-4 border-t border-gray-100 bg-gray-50">
           <button
             class="px-5 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors"
@@ -980,5 +1272,12 @@ onMounted(() => {
         </div>
       </div>
     </div>
+
+    <BatchOperationDialog
+      v-model:visible="showOperationDialog"
+      :batch="operationBatch"
+      :operation-type="currentOperationType"
+      @success="handleOperationSuccess"
+    />
   </div>
 </template>

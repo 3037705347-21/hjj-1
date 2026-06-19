@@ -1,7 +1,16 @@
-import type { ReagentBatch, BatchOperation, BatchFormData, OutboundFormData } from '@/types/batch'
+import type {
+  ReagentBatch,
+  BatchOperation,
+  BatchFormData,
+  OutboundFormData,
+  BatchOperationFormData,
+  BatchOperationType,
+} from '@/types/batch'
 import type { PageResult } from '@/types/common'
 import { generateId, getExpiryDays, isExpired, isExpiringSoon } from '@/utils/date'
 import { mockGetAllReagents } from './reagents'
+import { storage } from '@/utils/storage'
+import type { User } from '@/types/user'
 
 const BATCH_STORAGE_KEY = 'mock_batches'
 const OPERATION_STORAGE_KEY = 'mock_batch_operations'
@@ -38,7 +47,14 @@ function saveOperationsToStorage(operations: BatchOperation[]): void {
   localStorage.setItem(OPERATION_STORAGE_KEY, JSON.stringify(operations))
 }
 
+function getCurrentUser(): User | null {
+  return storage.getUser<User>()
+}
+
 function updateBatchStatus(batch: ReagentBatch): ReagentBatch {
+  if (batch.status === 'frozen') {
+    return batch
+  }
   if (batch.remainingQuantity <= 0) {
     return { ...batch, status: 'exhausted' }
   }
@@ -51,12 +67,43 @@ function updateBatchStatus(batch: ReagentBatch): ReagentBatch {
   return { ...batch, status: 'normal' }
 }
 
+function recalculateStatus(batch: ReagentBatch): ReagentBatch {
+  if (batch.remainingQuantity <= 0) {
+    return { ...batch, status: 'exhausted' }
+  }
+  if (isExpired(batch.expiryDate)) {
+    return { ...batch, status: 'expired' }
+  }
+  if (isExpiringSoon(batch.expiryDate, 30)) {
+    return { ...batch, status: 'warning' }
+  }
+  return { ...batch, status: 'normal' }
+}
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date)
+  result.setDate(result.getDate() + days)
+  return result
+}
+
+function addMonths(date: Date, months: number): Date {
+  const result = new Date(date)
+  result.setMonth(result.getMonth() + months)
+  return result
+}
+
+function addYears(date: Date, years: number): Date {
+  const result = new Date(date)
+  result.setFullYear(result.getFullYear() + years)
+  return result
+}
+
 function initMockBatches(): ReagentBatch[] {
   const reagentsData = localStorage.getItem('mock_reagents')
   let reagentIds: string[] = []
   const reagentNames: Record<string, string> = {}
   const reagentUnits: Record<string, string> = {}
-  
+
   if (reagentsData) {
     try {
       const reagents = JSON.parse(reagentsData)
@@ -69,11 +116,11 @@ function initMockBatches(): ReagentBatch[] {
       // 忽略解析错误，使用默认数据
     }
   }
-  
+
   if (reagentIds.length === 0) {
     return []
   }
-  
+
   const today = new Date()
   const batches: ReagentBatch[] = [
     {
@@ -197,7 +244,7 @@ function initMockBatches(): ReagentBatch[] {
       remark: '已用完，待补货',
     },
   ]
-  
+
   saveBatchesToStorage(batches)
   initMockOperations(batches)
   return batches
@@ -206,13 +253,15 @@ function initMockBatches(): ReagentBatch[] {
 function initMockOperations(batches: ReagentBatch[]): void {
   const operations: BatchOperation[] = []
   const today = new Date()
-  
+
   if (batches.length >= 2) {
     operations.push({
       id: generateId(),
       batchId: batches[0].id,
       type: 'in',
       quantity: batches[0].initialQuantity,
+      beforeQuantity: 0,
+      afterQuantity: batches[0].initialQuantity,
       operator: '2',
       operatorName: '李主任',
       purpose: '入库',
@@ -223,6 +272,8 @@ function initMockOperations(batches: ReagentBatch[]): void {
       batchId: batches[0].id,
       type: 'out',
       quantity: 20,
+      beforeQuantity: 100,
+      afterQuantity: 80,
       operator: '3',
       operatorName: '王实验员',
       purpose: 'Western Blot实验',
@@ -233,43 +284,29 @@ function initMockOperations(batches: ReagentBatch[]): void {
       batchId: batches[0].id,
       type: 'out',
       quantity: 15,
+      beforeQuantity: 80,
+      afterQuantity: 65,
       operator: '3',
       operatorName: '王实验员',
       purpose: 'ELISA实验',
       createdAt: new Date(today.getTime() - 15 * 24 * 60 * 60 * 1000).toISOString(),
     })
-    
+
     operations.push({
       id: generateId(),
       batchId: batches[1].id,
       type: 'in',
       quantity: batches[1].initialQuantity,
+      beforeQuantity: 0,
+      afterQuantity: batches[1].initialQuantity,
       operator: '2',
       operatorName: '李主任',
       purpose: '入库',
       createdAt: new Date(today.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString(),
     })
   }
-  
+
   saveOperationsToStorage(operations)
-}
-
-function addDays(date: Date, days: number): Date {
-  const result = new Date(date)
-  result.setDate(result.getDate() + days)
-  return result
-}
-
-function addMonths(date: Date, months: number): Date {
-  const result = new Date(date)
-  result.setMonth(result.getMonth() + months)
-  return result
-}
-
-function addYears(date: Date, years: number): Date {
-  const result = new Date(date)
-  result.setFullYear(result.getFullYear() + years)
-  return result
 }
 
 export async function mockGetBatches(
@@ -281,29 +318,35 @@ export async function mockGetBatches(
   return new Promise((resolve) => {
     setTimeout(async () => {
       let batches = getBatchesFromStorage()
-      
+
       batches = batches.map(updateBatchStatus)
       saveBatchesToStorage(batches)
-      
+
       if (reagentId) {
-        batches = batches.filter(b => b.reagentId === reagentId)
+        batches = batches.filter((b) => b.reagentId === reagentId)
       }
-      
+
       if (status) {
-        batches = batches.filter(b => b.status === status)
+        batches = batches.filter((b) => b.status === status)
       }
-      
+
       batches.sort((a, b) => {
-        const statusOrder = { warning: 0, expired: 1, normal: 2, exhausted: 3 }
-        const orderDiff = statusOrder[a.status] - statusOrder[b.status]
+        const statusOrder: Record<string, number> = {
+          warning: 0,
+          expired: 1,
+          frozen: 2,
+          normal: 3,
+          exhausted: 4,
+        }
+        const orderDiff = (statusOrder[a.status] || 0) - (statusOrder[b.status] || 0)
         if (orderDiff !== 0) return orderDiff
         return new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime()
       })
-      
+
       const reagents = await mockGetAllReagents()
-      const reagentMap = new Map(reagents.map(r => [r.id, r]))
-      
-      batches = batches.map(batch => {
+      const reagentMap = new Map(reagents.map((r) => [r.id, r]))
+
+      batches = batches.map((batch) => {
         const reagent = reagentMap.get(batch.reagentId)
         return {
           ...batch,
@@ -311,10 +354,10 @@ export async function mockGetBatches(
           unit: reagent?.unit || batch.unit,
         }
       })
-      
+
       const start = (page - 1) * pageSize
       const list = batches.slice(start, start + pageSize)
-      
+
       resolve({
         list,
         total: batches.length,
@@ -325,22 +368,24 @@ export async function mockGetBatches(
   })
 }
 
-export function mockGetBatch(id: string): Promise<(ReagentBatch & { operations: BatchOperation[] }) | null> {
+export function mockGetBatch(
+  id: string
+): Promise<(ReagentBatch & { operations: BatchOperation[] }) | null> {
   return new Promise((resolve) => {
     setTimeout(() => {
       const batches = getBatchesFromStorage().map(updateBatchStatus)
-      const batch = batches.find(b => b.id === id)
-      
+      const batch = batches.find((b) => b.id === id)
+
       if (!batch) {
         resolve(null)
         return
       }
-      
+
       const allOperations = getOperationsFromStorage()
       const operations = allOperations
-        .filter(op => op.batchId === id)
+        .filter((op) => op.batchId === id)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-      
+
       resolve({ ...batch, operations })
     }, 300)
   })
@@ -351,8 +396,9 @@ export function mockCreateBatch(data: BatchFormData): Promise<ReagentBatch> {
     setTimeout(async () => {
       const batches = getBatchesFromStorage()
       const reagents = await mockGetAllReagents()
-      const reagent = reagents.find(r => r.id === data.reagentId)
-      
+      const reagent = reagents.find((r) => r.id === data.reagentId)
+      const user = getCurrentUser()
+
       const newBatch: ReagentBatch = updateBatchStatus({
         id: generateId(),
         reagentId: data.reagentId,
@@ -368,64 +414,230 @@ export function mockCreateBatch(data: BatchFormData): Promise<ReagentBatch> {
         status: 'normal',
         remark: data.remark,
       })
-      
+
       batches.unshift(newBatch)
       saveBatchesToStorage(batches)
-      
+
       const operations = getOperationsFromStorage()
       operations.unshift({
         id: generateId(),
         batchId: newBatch.id,
         type: 'in',
         quantity: data.initialQuantity,
-        operator: '2',
-        operatorName: '李主任',
+        beforeQuantity: 0,
+        afterQuantity: data.initialQuantity,
+        operator: user?.id || '2',
+        operatorName: user?.name || '李主任',
         purpose: '入库',
         createdAt: new Date().toISOString(),
       })
       saveOperationsToStorage(operations)
-      
+
       resolve(newBatch)
     }, 400)
   })
 }
 
-export function mockBatchOutbound(id: string, data: OutboundFormData): Promise<BatchOperation> {
+export function mockBatchOutbound(
+  id: string,
+  data: OutboundFormData
+): Promise<BatchOperation> {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const batches = getBatchesFromStorage()
-      const index = batches.findIndex(b => b.id === id)
-      
+      const index = batches.findIndex((b) => b.id === id)
+
       if (index === -1) {
         reject(new Error('批次不存在'))
         return
       }
-      
+
       const batch = batches[index]
+      if (batch.status === 'frozen') {
+        reject(new Error('批次已冻结，无法出库'))
+        return
+      }
+      if (batch.status === 'expired') {
+        reject(new Error('批次已过期，无法出库'))
+        return
+      }
+      if (batch.status === 'exhausted') {
+        reject(new Error('批次已耗尽，无法出库'))
+        return
+      }
       if (batch.remainingQuantity < data.quantity) {
         reject(new Error('库存不足'))
         return
       }
-      
-      batch.remainingQuantity = Number((batch.remainingQuantity - data.quantity).toFixed(2))
+
+      const user = getCurrentUser()
+      const beforeQuantity = batch.remainingQuantity
+      batch.remainingQuantity = Number(
+        (batch.remainingQuantity - data.quantity).toFixed(2)
+      )
       batches[index] = updateBatchStatus(batch)
       saveBatchesToStorage(batches)
-      
+
       const operation: BatchOperation = {
         id: generateId(),
         batchId: id,
         type: 'out',
         quantity: data.quantity,
-        operator: '3',
-        operatorName: '王实验员',
+        beforeQuantity,
+        afterQuantity: batch.remainingQuantity,
+        operator: user?.id || '3',
+        operatorName: user?.name || '王实验员',
         purpose: data.purpose,
         createdAt: new Date().toISOString(),
       }
-      
+
       const operations = getOperationsFromStorage()
       operations.unshift(operation)
       saveOperationsToStorage(operations)
-      
+
+      resolve(operation)
+    }, 300)
+  })
+}
+
+export function mockBatchOperation(
+  id: string,
+  data: BatchOperationFormData
+): Promise<BatchOperation> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const batches = getBatchesFromStorage()
+      const index = batches.findIndex((b) => b.id === id)
+
+      if (index === -1) {
+        reject(new Error('批次不存在'))
+        return
+      }
+
+      const batch = { ...batches[index] }
+      const user = getCurrentUser()
+      const beforeQuantity = batch.remainingQuantity
+      let afterQuantity = beforeQuantity
+
+      const validateQuantity = () => {
+        if (data.quantity === undefined || data.quantity <= 0) {
+          throw new Error('请输入有效数量')
+        }
+      }
+
+      try {
+        switch (data.type) {
+          case 'return':
+            if (batch.status === 'frozen') throw new Error('批次已冻结，无法退库')
+            if (batch.status === 'expired') throw new Error('批次已过期，无法退库')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法退库')
+            validateQuantity()
+            afterQuantity = Number((beforeQuantity + data.quantity!).toFixed(2))
+            batch.remainingQuantity = afterQuantity
+            break
+
+          case 'scrap':
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无需报废')
+            validateQuantity()
+            if (data.quantity! > beforeQuantity) throw new Error('报废数量不能超过库存')
+            afterQuantity = Number((beforeQuantity - data.quantity!).toFixed(2))
+            batch.remainingQuantity = afterQuantity
+            break
+
+          case 'transfer':
+            if (batch.status === 'frozen') throw new Error('批次已冻结，无法调拨')
+            if (batch.status === 'expired') throw new Error('批次已过期，无法调拨')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法调拨')
+            validateQuantity()
+            if (data.quantity! > beforeQuantity) throw new Error('调拨数量不能超过库存')
+            if (!data.targetLocation?.trim()) throw new Error('请输入目标存放位置')
+            afterQuantity = Number((beforeQuantity - data.quantity!).toFixed(2))
+            batch.remainingQuantity = afterQuantity
+            break
+
+          case 'stock_in':
+            if (batch.status === 'frozen') throw new Error('批次已冻结，无法盘盈')
+            if (batch.status === 'expired') throw new Error('批次已过期，无法盘盈')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法盘盈')
+            validateQuantity()
+            afterQuantity = Number((beforeQuantity + data.quantity!).toFixed(2))
+            batch.remainingQuantity = afterQuantity
+            break
+
+          case 'stock_out':
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无需盘亏')
+            validateQuantity()
+            if (data.quantity! > beforeQuantity) throw new Error('盘亏数量不能超过库存')
+            afterQuantity = Number((beforeQuantity - data.quantity!).toFixed(2))
+            batch.remainingQuantity = afterQuantity
+            break
+
+          case 'freeze':
+            if (batch.status === 'frozen') throw new Error('批次已处于冻结状态')
+            if (batch.status === 'expired') throw new Error('批次已过期，无法冻结')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法冻结')
+            batch.status = 'frozen'
+            break
+
+          case 'unfreeze':
+            if (batch.status !== 'frozen') throw new Error('批次未处于冻结状态')
+            batch.status = recalculateStatus(batch).status
+            break
+
+          case 'open':
+            if (batch.status === 'frozen') throw new Error('批次已冻结，无法开封')
+            if (batch.status === 'expired') throw new Error('批次已过期，无法开封')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法开封')
+            batch.openedAt = new Date().toISOString()
+            break
+
+          case 'retest':
+            if (batch.status === 'frozen') throw new Error('批次已冻结，无法复测')
+            if (batch.status === 'expired') throw new Error('批次已过期，无法复测')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法复测')
+            batch.lastRetestAt = new Date().toISOString()
+            break
+
+          case 'extend_retest':
+            if (batch.status === 'frozen') throw new Error('批次已冻结，无法延期复验')
+            if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法延期复验')
+            if (!data.newExpiryDate) throw new Error('请选择新的有效期')
+            batch.expiryDate = data.newExpiryDate
+            batch.lastRetestAt = new Date().toISOString()
+            batch.status = recalculateStatus(batch).status
+            break
+
+          default:
+            throw new Error('未知操作类型')
+        }
+      } catch (e: any) {
+        reject(e)
+        return
+      }
+
+      batches[index] = batch.status !== 'frozen' ? updateBatchStatus(batch) : batch
+      saveBatchesToStorage(batches)
+
+      const operation: BatchOperation = {
+        id: generateId(),
+        batchId: id,
+        type: data.type,
+        quantity: data.quantity || 0,
+        beforeQuantity,
+        afterQuantity,
+        operator: user?.id || '3',
+        operatorName: user?.name || '王实验员',
+        reason: data.reason,
+        remark: data.remark,
+        targetLocation: data.targetLocation,
+        newExpiryDate: data.newExpiryDate,
+        createdAt: new Date().toISOString(),
+      }
+
+      const operations = getOperationsFromStorage()
+      operations.unshift(operation)
+      saveOperationsToStorage(operations)
+
       resolve(operation)
     }, 300)
   })
@@ -436,7 +648,7 @@ export function mockGetExpiringBatches(days: number = 30): Promise<ReagentBatch[
     setTimeout(() => {
       const batches = getBatchesFromStorage().map(updateBatchStatus)
       const expiring = batches
-        .filter(b => {
+        .filter((b) => {
           const expiryDays = getExpiryDays(b.expiryDate)
           return expiryDays <= days || b.status === 'expired'
         })
@@ -452,7 +664,14 @@ export function mockGetExpiringBatches(days: number = 30): Promise<ReagentBatch[
   })
 }
 
-export function mockGetBatchStats(): Promise<{ total: number; normal: number; warning: number; expired: number; exhausted: number }> {
+export function mockGetBatchStats(): Promise<{
+  total: number
+  normal: number
+  warning: number
+  expired: number
+  exhausted: number
+  frozen: number
+}> {
   return new Promise((resolve) => {
     setTimeout(() => {
       const batches = getBatchesFromStorage().map(updateBatchStatus)
@@ -462,8 +681,9 @@ export function mockGetBatchStats(): Promise<{ total: number; normal: number; wa
         warning: 0,
         expired: 0,
         exhausted: 0,
+        frozen: 0,
       }
-      batches.forEach(b => {
+      batches.forEach((b) => {
         stats[b.status]++
       })
       resolve(stats)
