@@ -31,7 +31,7 @@ function saveBatchesToStorage(batches: ReagentBatch[]): void {
   localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(batches))
 }
 
-function getOperationsFromStorage(): BatchOperation[] {
+export function getOperationsFromStorage(): BatchOperation[] {
   const data = localStorage.getItem(OPERATION_STORAGE_KEY)
   if (data) {
     try {
@@ -51,7 +51,7 @@ function getCurrentUser(): User | null {
   return storage.getUser<User>()
 }
 
-function updateBatchStatus(batch: ReagentBatch): ReagentBatch {
+export function updateBatchStatus(batch: ReagentBatch): ReagentBatch {
   if (batch.status === 'frozen') {
     return batch
   }
