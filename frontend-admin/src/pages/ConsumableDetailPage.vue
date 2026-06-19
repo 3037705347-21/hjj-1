@@ -34,7 +34,7 @@ import {
   operationTypeColors,
   operationTypeConfigs,
 } from '@/types/consumable'
-import { mockGetConsumableDetail } from '@/mock/consumables'
+import { mockGetConsumableDetail, mockGetConsumable } from '@/mock/consumables'
 import { formatDate } from '@/utils/date'
 import ConsumableOperationModal from '@/components/ConsumableOperationModal.vue'
 import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
@@ -120,6 +120,19 @@ const openOperationModal = (type: ConsumableOperationType) => {
   if (!consumable.value) return
   currentOperationType.value = type
   operationModalVisible.value = true
+}
+
+const handleOperationScanConsumable = async (consumableId: string) => {
+  try {
+    const data = await mockGetConsumable(consumableId)
+    if (!data) {
+      alert('扫码未找到对应耗材，请检查标签是否有效')
+      return
+    }
+    consumable.value = data
+  } catch (e: any) {
+    alert(e.message || '切换耗材失败')
+  }
 }
 
 const handleOperationSuccess = () => {
@@ -572,6 +585,7 @@ onMounted(() => {
       :consumable="consumable"
       :operation-type="currentOperationType"
       @success="handleOperationSuccess"
+      @scan-consumable="handleOperationScanConsumable"
     />
 
     <LabelPrintDialog

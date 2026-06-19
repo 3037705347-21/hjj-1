@@ -12,7 +12,11 @@ import {
   PackagePlus,
   UserCheck,
   RotateCcw,
+  ScanLine,
 } from 'lucide-vue-next'
+import ScanSearchBox from './ScanSearchBox.vue'
+import { parseLabelCode } from '@/utils/label'
+import type { LabelEntityType } from '@/types/label'
 import type {
   Consumable,
   ConsumableOperationType,
@@ -33,6 +37,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   success: []
+  'scan-consumable': [consumableId: string]
 }>()
 
 const loading = ref(false)
@@ -86,6 +91,18 @@ watch(
 
 const close = () => {
   emit('update:visible', false)
+}
+
+const handleOperationScan = (payload: { entityType: LabelEntityType | null; entityId: string; code: string }) => {
+  if (!payload.entityType || !payload.entityId) {
+    alert('未识别到有效的耗材标签')
+    return
+  }
+  if (payload.entityType !== 'consumable') {
+    alert(`扫码识别为${payload.entityType === 'reagent' ? '试剂' : '批次'}，请扫描耗材标签`)
+    return
+  }
+  emit('scan-consumable', payload.entityId)
 }
 
 const handleSubmit = async () => {
@@ -172,6 +189,20 @@ const handleSubmit = async () => {
       </div>
 
       <div class="p-6 space-y-4">
+        <div class="p-3 bg-amber-50 rounded-xl border border-amber-100">
+          <div class="text-xs text-amber-700 font-medium mb-2 flex items-center gap-1">
+            <ScanLine class="w-3.5 h-3.5" />
+            扫码切换操作耗材（预留接入扫码枪）
+          </div>
+          <ScanSearchBox
+            placeholder="扫描耗材标签或输入编号..."
+            @scan="handleOperationScan"
+          />
+          <p class="text-[11px] text-amber-600 mt-1.5">
+            支持的操作：入库、领用出库、调拨、库存调整、报损、退库、使用消耗等所有耗材操作
+          </p>
+        </div>
+
         <div class="p-4 bg-gray-50 rounded-xl">
           <div class="text-xs text-gray-500 mb-1">耗材名称</div>
           <div class="font-medium text-gray-800">{{ consumable.name }}</div>

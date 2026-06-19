@@ -537,6 +537,19 @@ const openOperationModal = (consumable: Consumable, type: ConsumableOperationTyp
   operationModalVisible.value = true
 }
 
+const handleOperationScanConsumable = async (consumableId: string) => {
+  try {
+    const data = await mockGetConsumable(consumableId)
+    if (!data) {
+      alert('扫码未找到对应耗材，请检查标签是否有效')
+      return
+    }
+    currentOperationConsumable.value = data
+  } catch (e: any) {
+    alert(e.message || '切换耗材失败')
+  }
+}
+
 const handleOperationSuccess = () => {
   fetchData()
   if (activeTab.value === 'operations') {
@@ -1271,6 +1284,7 @@ onMounted(() => {
       :consumable="currentOperationConsumable"
       :operation-type="currentOperationType"
       @success="handleOperationSuccess"
+      @scan-consumable="handleOperationScanConsumable"
     />
 
     <BatchImportDialog
