@@ -27,6 +27,21 @@ import {
   operationTypeConfigs,
 } from '@/types/consumable'
 import { mockConsumableOperation } from '@/mock/consumables'
+import { useAuditLog } from '@/composables/useAuditLog'
+
+const auditLog = useAuditLog()
+
+function formatConsumableContent(c: any): string {
+  const parts: string[] = []
+  parts.push(`分类: ${c.category}`)
+  if (c.specification) parts.push(`规格: ${c.specification}`)
+  parts.push(`单位: ${c.unit}`)
+  parts.push(`库存: ${c.currentStock || c.stockQuantity}/${c.minStock || c.safetyStock}`)
+  if (c.location) parts.push(`库位: ${c.location}`)
+  if (c.manufacturer) parts.push(`厂家: ${c.manufacturer}`)
+  if (c.brand) parts.push(`品牌: ${c.brand}`)
+  return parts.join(', ')
+}
 
 const props = defineProps<{
   visible: boolean
@@ -143,6 +158,7 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
+    const beforeContent = props.consumable ? formatConsumableContent(props.consumable) : ''
     await mockConsumableOperation(props.consumable.id, {
       type: props.operationType,
       quantity: form.quantity,
@@ -152,6 +168,23 @@ const handleSubmit = async () => {
       targetLocation: form.targetLocation || undefined,
       adjustType: form.adjustType,
     })
+    if (props.consumable && props.operationType) {
+      const operationRemark = [
+        form.quantity ? `数量:${form.quantity}` : '',
+        form.purpose ? `用途:${form.purpose}` : '',
+        form.reason ? `原因:${form.reason}` : '',
+        form.targetLocation ? `目标库位:${form.targetLocation}` : '',
+        form.adjustType ? `调整方式:${form.adjustType === 'increase' ? '增加' : '减少'}` : '',
+        form.remark ? `备注:${form.remark}` : '',
+      ].filter(Boolean).join(', ')
+      auditLog.logConsumableOperation(
+        props.consumable.id,
+        props.consumable.name,
+        props.operationType,
+        beforeContent,
+        operationRemark
+      )
+    }
     close()
     emit('success')
   } catch (e: any) {

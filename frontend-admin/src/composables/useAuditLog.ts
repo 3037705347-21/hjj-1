@@ -61,38 +61,38 @@ export function useAuditLog() {
     })
   }
 
-  function logReagentBatchDelete(ids: string[], names: string[]): void {
+  function logReagentBatchDelete(ids: string[], names: string[], remark?: string): void {
     log('reagent', 'batch_delete', 'reagent', ids.join(','), names.join(', '), {
-      remark: `批量删除 ${ids.length} 条试剂`,
+      remark: remark || `批量删除 ${ids.length} 条试剂`,
     })
   }
 
-  function logReagentBatchUpdate(ids: string[], names: string[], field: string, value: string): void {
+  function logReagentBatchUpdate(ids: string[], names: string[], field: string, beforeValue: string, afterValue: string): void {
     log('reagent', 'batch_update', 'reagent', ids.join(','), names.join(', '), {
-      afterContent: `${field}: ${value}`,
+      beforeContent: beforeValue ? `${field}: ${beforeValue}` : '',
+      afterContent: `${field}: ${afterValue}`,
       remark: `批量更新 ${ids.length} 条试剂的${field}`,
     })
   }
 
-  function logReagentImport(total: number, success: number): void {
+  function logReagentImport(total: number, remark?: string): void {
     log('reagent', 'import', 'reagent', '', '批量导入试剂', {
-      afterContent: `总计: ${total}, 成功: ${success}`,
-      remark: 'CSV导入试剂',
+      afterContent: `总计: ${total}`,
+      remark: remark || 'CSV导入试剂',
     })
   }
 
-  function logBatchCreate(batchId: string, batchNumber: string, quantity: number, unit: string): void {
+  function logBatchCreate(batchId: string, batchNumber: string, reagentName: string, remark?: string): void {
     log('batch', 'inbound', 'batch', batchId, batchNumber, {
-      beforeContent: `库存: 0 ${unit}`,
-      afterContent: `库存: ${quantity} ${unit}`,
-      remark: '新批次入库',
+      afterContent: `试剂: ${reagentName}`,
+      remark: remark || '新批次入库',
     })
   }
 
-  function logBatchOutbound(batchId: string, batchNumber: string, beforeQty: number, afterQty: number, unit: string, purpose: string): void {
+  function logBatchOutbound(batchId: string, batchNumber: string, reagentName: string, quantity: number, purpose: string, beforeContent?: string): void {
     log('batch', 'outbound', 'batch', batchId, batchNumber, {
-      beforeContent: `库存: ${beforeQty} ${unit}`,
-      afterContent: `库存: ${afterQty} ${unit}`,
+      beforeContent,
+      afterContent: `出库数量: ${quantity}, 试剂: ${reagentName}, 用途: ${purpose}`,
       remark: purpose,
     })
   }
@@ -100,22 +100,21 @@ export function useAuditLog() {
   function logBatchOperation(
     batchId: string,
     batchNumber: string,
+    reagentName: string,
     operationType: AuditOperationType,
-    beforeQty: number,
-    afterQty: number,
-    unit: string,
+    beforeContent: string,
     remark: string
   ): void {
     log('batch', operationType, 'batch', batchId, batchNumber, {
-      beforeContent: `库存: ${beforeQty} ${unit}`,
-      afterContent: `库存: ${afterQty} ${unit}`,
+      beforeContent,
+      afterContent: `试剂: ${reagentName}`,
       remark,
     })
   }
 
-  function logBatchDelete(ids: string[], names: string[]): void {
+  function logBatchDelete(ids: string[], names: string[], remark?: string): void {
     log('batch', 'batch_delete', 'batch', ids.join(','), names.join(', '), {
-      remark: `批量删除 ${ids.length} 个批次`,
+      remark: remark || `批量删除 ${ids.length} 个批次`,
     })
   }
 
@@ -145,43 +144,48 @@ export function useAuditLog() {
     consumableId: string,
     consumableName: string,
     operationType: AuditOperationType,
-    beforeQty: number,
-    afterQty: number,
-    unit: string,
+    beforeContent: string,
     remark: string
   ): void {
     log('consumable', operationType, 'consumable', consumableId, consumableName, {
-      beforeContent: `库存: ${beforeQty} ${unit}`,
-      afterContent: `库存: ${afterQty} ${unit}`,
+      beforeContent,
       remark,
     })
   }
 
-  function logConsumableBatchDelete(ids: string[], names: string[]): void {
+  function logConsumableBatchDelete(ids: string[], names: string[], remark?: string): void {
     log('consumable', 'batch_delete', 'consumable', ids.join(','), names.join(', '), {
-      remark: `批量删除 ${ids.length} 条耗材`,
+      remark: remark || `批量删除 ${ids.length} 条耗材`,
     })
   }
 
-  function logAlertHandle(alertId: string, alertTitle: string, action: string, beforeStatus: string, afterStatus: string, remark?: string): void {
+  function logConsumableBatchUpdate(ids: string[], names: string[], field: string, beforeValue: string, afterValue: string): void {
+    log('consumable', 'batch_update', 'consumable', ids.join(','), names.join(', '), {
+      beforeContent: beforeValue ? `${field}: ${beforeValue}` : '',
+      afterContent: `${field}: ${afterValue}`,
+      remark: `批量更新 ${ids.length} 条耗材的${field}`,
+    })
+  }
+
+  function logAlertHandle(alertId: string, alertTitle: string, action: string, beforeContent: string, remark?: string): void {
     const operationTypeMap: Record<string, AuditOperationType> = {
+      mark_read: 'read',
       read: 'read',
       ignore: 'ignore',
       assign: 'assign',
       resolve: 'resolve',
     }
     log('alert', operationTypeMap[action] || 'handle', 'alert', alertId, alertTitle, {
-      beforeContent: `状态: ${beforeStatus}`,
-      afterContent: `状态: ${afterStatus}`,
+      beforeContent,
       remark,
     })
   }
 
-  function logAlertRuleUpdate(ruleId: string, ruleName: string, beforeContent: string, afterContent: string): void {
+  function logAlertRuleUpdate(ruleId: string, ruleName: string, field: string, beforeContent: string, afterContent: string, remark?: string): void {
     log('alert', 'update_rule', 'alert_rule', ruleId, ruleName, {
       beforeContent,
       afterContent,
-      remark: '更新预警规则',
+      remark: remark || '更新预警规则',
     })
   }
 
@@ -231,6 +235,7 @@ export function useAuditLog() {
     logConsumableDelete,
     logConsumableOperation,
     logConsumableBatchDelete,
+    logConsumableBatchUpdate,
     logAlertHandle,
     logAlertRuleUpdate,
     logAlertRuleToggle,

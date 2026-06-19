@@ -45,6 +45,9 @@ export type AuditOperationType =
   | 'approval_submit'
   | 'approval_approve'
   | 'approval_reject'
+  | 'in'
+  | 'out'
+  | 'receive'
 
 export interface AuditLog {
   id: string
@@ -97,6 +100,8 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   export: '导出',
   inbound: '入库',
   outbound: '出库',
+  in: '入库',
+  out: '出库',
   stock_in: '入库',
   stock_out: '盘亏',
   use: '领用',
@@ -120,6 +125,7 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   approval_submit: '提交审批',
   approval_approve: '审批通过',
   approval_reject: '审批驳回',
+  receive: '采购入库',
 }
 
 export interface AuditLogFilterParams {

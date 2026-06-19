@@ -4,6 +4,7 @@ import { mockLogin, mockLogout, mockGetCurrentUser } from '@/mock/auth'
 import { storage } from '@/utils/storage'
 import type { PermissionCode, DataScope } from '@/types/permission'
 import { rolePermissions, roleDataScopes } from '@/types/permission'
+import { useAuditLog } from '@/composables/useAuditLog'
 
 interface UserState {
   user: User | null
@@ -82,19 +83,30 @@ export function useUserStore() {
 
   async function login(request: LoginRequest): Promise<void> {
     state.loading = true
+    const auditLog = useAuditLog()
     try {
       const result = await mockLogin(request)
       state.token = result.token
       state.user = result.user
       storage.setToken(result.token)
       storage.setUser(result.user)
+      auditLog.logLogin(result.user.id, result.user.name, true)
+    } catch (e: any) {
+      auditLog.logLogin('', request.username, false)
+      throw e
     } finally {
       state.loading = false
     }
   }
 
   async function logout(): Promise<void> {
+    const auditLog = useAuditLog()
+    const userId = state.user?.id || ''
+    const userName = state.user?.name || ''
     await mockLogout()
+    if (userId && userName) {
+      auditLog.logLogout(userId, userName)
+    }
     state.token = null
     state.user = null
     storage.clear()

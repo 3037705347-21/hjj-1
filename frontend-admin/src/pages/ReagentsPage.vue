@@ -68,6 +68,25 @@ import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
 import ScanSearchBox from '@/components/ScanSearchBox.vue'
 import ScanResultCard from '@/components/ScanResultCard.vue'
 import type { LabelData, LabelEntityType } from '@/types/label'
+import { useAuditLog } from '@/composables/useAuditLog'
+
+const auditLog = useAuditLog()
+
+function formatReagentContent(r: any): string {
+  const parts: string[] = []
+  parts.push(`分类: ${r.category}`)
+  parts.push(`规格: ${r.specification}`)
+  parts.push(`单位: ${r.unit}`)
+  if (r.brand) parts.push(`品牌: ${r.brand}`)
+  if (r.manufacturer) parts.push(`厂家: ${r.manufacturer}`)
+  parts.push(`存储条件: ${r.storageCondition}`)
+  if (r.hazardLevel) parts.push(`危险等级: ${r.hazardLevel}`)
+  parts.push(`状态: ${r.enabled ? '启用' : '停用'}`)
+  if (r.casNumber) parts.push(`CAS: ${r.casNumber}`)
+  return parts.join(', ')
+}
+
+const originalReagentData = ref<any>(null)
 
 const router = useRouter()
 const loading = ref(false)
@@ -256,6 +275,7 @@ const openEditModal = async (id: string) => {
   try {
     const reagent = await mockGetReagent(id)
     if (reagent) {
+      originalReagentData.value = { ...reagent }
       Object.assign(formData, {
         ...defaultFormData(),
         name: reagent.name,
@@ -326,8 +346,12 @@ const handleSubmit = async () => {
   try {
     if (formMode.value === 'create') {
       await mockCreateReagent({ ...formData })
+      auditLog.logReagentCreate('', formData.name, formatReagentContent(formData))
     } else {
+      const before = originalReagentData.value ? formatReagentContent(originalReagentData.value) : ''
       await mockUpdateReagent(currentId.value, { ...formData })
+      auditLog.logReagentUpdate(currentId.value, formData.name, before, formatReagentContent(formData))
+      originalReagentData.value = null
     }
     showFormModal.value = false
     fetchData()
@@ -343,7 +367,11 @@ const handleDelete = async (id: string) => {
     return
   }
   try {
+    const beforeDelete = data.value?.list.find(r => r.id === id)
     await mockDeleteReagent(id)
+    if (beforeDelete) {
+      auditLog.logReagentDelete(id, beforeDelete.name, formatReagentContent(beforeDelete))
+    }
     if (data.value?.list.length === 1 && pagination.page > 1) {
       pagination.page--
     }
@@ -421,7 +449,12 @@ const handleBatchAction = (action: string) => {
 const handleBatchDelete = async () => {
   batchDeleteLoading.value = true
   try {
+    const deletedNames = selectedIds.value
+      .map(id => data.value?.list.find(r => r.id === id))
+      .filter(Boolean)
+      .map(r => r!.name)
     await mockBatchDeleteReagents(selectedIds.value)
+    auditLog.logReagentBatchDelete(selectedIds.value, deletedNames, `批量删除 ${selectedIds.value.length} 个试剂`)
     showBatchDeleteConfirm.value = false
     clearSelection()
     if (data.value?.list && selectedIds.value.length >= data.value.list.length && pagination.page > 1) {
@@ -439,10 +472,16 @@ const handleBatchDelete = async () => {
 const handleBatchEditConfirm = async (values: Record<string, any>) => {
   batchEditLoading.value = true
   try {
+    const affectedNames = selectedIds.value
+      .map(id => data.value?.list.find(r => r.id === id))
+      .filter(Boolean)
+      .map(r => r!.name)
     if (batchEditType.value === 'category') {
       await mockBatchUpdateReagentCategory(selectedIds.value, values.category)
+      auditLog.logReagentBatchUpdate(selectedIds.value, affectedNames, '分类', '', values.category)
     } else if (batchEditType.value === 'storage') {
       await mockBatchUpdateReagentStorageCondition(selectedIds.value, values.storageCondition)
+      auditLog.logReagentBatchUpdate(selectedIds.value, affectedNames, '储存条件', '', values.storageCondition)
     }
     showBatchEditDialog.value = false
     clearSelection()
@@ -460,7 +499,12 @@ const handleBatchStatusUpdate = async (enabled: boolean) => {
     return
   }
   try {
+    const affectedNames = selectedIds.value
+      .map(id => data.value?.list.find(r => r.id === id))
+      .filter(Boolean)
+      .map(r => r!.name)
     await mockBatchUpdateReagentStatus(selectedIds.value, enabled)
+    auditLog.logReagentBatchUpdate(selectedIds.value, affectedNames, '状态', String(!enabled), String(enabled))
     clearSelection()
     fetchData()
     alert('操作成功')
@@ -474,6 +518,7 @@ const handleBatchImport = async (file: File) => {
   importResult.value = null
   try {
     const result = await mockBatchImportReagents(file)
+    auditLog.logReagentImport(result.total, `导入文件: ${file.name}, 成功${result.success}条, 失败${result.failed}条`)
     importResult.value = result
     fetchData()
   } catch (e: any) {

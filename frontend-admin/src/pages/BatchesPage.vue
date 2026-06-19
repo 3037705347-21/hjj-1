@@ -80,6 +80,20 @@ import BatchOperationDialog from '@/components/BatchOperationDialog.vue'
 import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
 import ScanSearchBox from '@/components/ScanSearchBox.vue'
 import ScanResultCard from '@/components/ScanResultCard.vue'
+import { useAuditLog } from '@/composables/useAuditLog'
+
+const auditLog = useAuditLog()
+
+function formatBatchContent(b: any): string {
+  const parts: string[] = []
+  parts.push(`批次号: ${b.batchNumber}`)
+  if (b.reagentName) parts.push(`试剂: ${b.reagentName}`)
+  parts.push(`数量: ${b.remainingQuantity}/${b.initialQuantity || b.currentQuantity}`)
+  if (b.storageLocation) parts.push(`库位: ${b.storageLocation}`)
+  parts.push(`有效期: ${b.expiryDate}`)
+  if (b.status) parts.push(`状态: ${b.status}`)
+  return parts.join(', ')
+}
 
 const route = useRoute()
 const permission = usePermission()
@@ -307,7 +321,17 @@ const handleBatchAction = (action: string) => {
 const handleBatchDelete = async () => {
   batchDeleteLoading.value = true
   try {
+    const deletedBatches = selectedIds.value
+      .map(id => data.value?.list.find(b => b.id === id))
+      .filter(Boolean) as ReagentBatch[]
     await mockBatchDeleteBatches(selectedIds.value)
+    if (deletedBatches.length > 0) {
+      auditLog.logBatchDelete(
+        selectedIds.value,
+        deletedBatches.map(b => b.batchNumber),
+        `批量删除 ${selectedIds.value.length} 个批次`
+      )
+    }
     showBatchDeleteConfirm.value = false
     clearSelection()
     if (data.value?.list && selectedIds.value.length >= data.value.list.length && pagination.page > 1) {
@@ -463,7 +487,10 @@ const handleCreateSubmit = async () => {
 
   createLoading.value = true
   try {
+    const reagent = reagents.value.find(r => r.id === createForm.reagentId)
     await mockCreateBatch(createForm)
+    auditLog.logBatchCreate('', createForm.batchNumber, reagent?.name || '', 
+      `入库${createForm.initialQuantity}, 库位:${createForm.storageLocation}, 有效期:${createForm.expiryDate}`)
     showCreateModal.value = false
     fetchData()
   } catch (e: any) {
@@ -522,7 +549,13 @@ const handleOutboundSubmit = async () => {
 
   outboundLoading.value = true
   try {
+    const batch = data.value?.list.find(b => b.id === outboundBatchId.value)
+    const beforeContent = batch ? formatBatchContent(batch) : ''
     await mockBatchOutbound(outboundBatchId.value, outboundForm)
+    if (batch) {
+      auditLog.logBatchOutbound(batch.id, batch.batchNumber, batch.reagentName, 
+        outboundForm.quantity, outboundForm.purpose, beforeContent)
+    }
     showOutboundModal.value = false
     fetchData()
     if (currentBatch.value && currentBatch.value.id === outboundBatchId.value) {

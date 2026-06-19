@@ -72,6 +72,23 @@ import ScanSearchBox from '@/components/ScanSearchBox.vue'
 import ScanResultCard from '@/components/ScanResultCard.vue'
 import type { LabelData, LabelEntityType } from '@/types/label'
 import { usePermission } from '@/composables/usePermission'
+import { useAuditLog } from '@/composables/useAuditLog'
+
+const auditLog = useAuditLog()
+
+function formatConsumableContent(c: any): string {
+  const parts: string[] = []
+  parts.push(`分类: ${c.category}`)
+  if (c.specification) parts.push(`规格: ${c.specification}`)
+  parts.push(`单位: ${c.unit}`)
+  parts.push(`库存: ${c.currentStock}/${c.minStock}`)
+  if (c.location) parts.push(`库位: ${c.location}`)
+  if (c.manufacturer) parts.push(`厂家: ${c.manufacturer}`)
+  if (c.brand) parts.push(`品牌: ${c.brand}`)
+  return parts.join(', ')
+}
+
+const originalConsumableData = ref<Consumable | null>(null)
 
 const router = useRouter()
 const permission = usePermission()
@@ -317,6 +334,7 @@ const openEditModal = async (id: string) => {
   try {
     const consumable = await mockGetConsumable(id)
     if (consumable) {
+      originalConsumableData.value = { ...consumable }
       Object.assign(formData, {
         name: consumable.name,
         category: consumable.category,
@@ -349,8 +367,12 @@ const handleSubmit = async () => {
   try {
     if (formMode.value === 'create') {
       await mockCreateConsumable(formData)
+      auditLog.logConsumableCreate('', formData.name, formatConsumableContent(formData))
     } else {
+      const before = originalConsumableData.value ? formatConsumableContent(originalConsumableData.value) : ''
       await mockUpdateConsumable(currentId.value, formData)
+      auditLog.logConsumableUpdate(currentId.value, formData.name, before, formatConsumableContent(formData))
+      originalConsumableData.value = null
     }
     showFormModal.value = false
     fetchData()
@@ -366,7 +388,11 @@ const handleDelete = async (id: string) => {
     return
   }
   try {
+    const beforeDelete = data.value?.list.find(c => c.id === id)
     await mockDeleteConsumable(id)
+    if (beforeDelete) {
+      auditLog.logConsumableDelete(id, beforeDelete.name, formatConsumableContent(beforeDelete))
+    }
     if (data.value?.list.length === 1 && pagination.page > 1) {
       pagination.page--
     }
@@ -438,7 +464,12 @@ const handleBatchAction = (action: string) => {
 const handleBatchDelete = async () => {
   batchDeleteLoading.value = true
   try {
+    const deletedNames = selectedIds.value
+      .map(id => data.value?.list.find(c => c.id === id))
+      .filter(Boolean)
+      .map(c => c!.name)
     await mockBatchDeleteConsumables(selectedIds.value)
+    auditLog.logConsumableBatchDelete(selectedIds.value, deletedNames, `批量删除 ${selectedIds.value.length} 个耗材`)
     showBatchDeleteConfirm.value = false
     clearSelection()
     if (data.value?.list && selectedIds.value.length >= data.value.list.length && pagination.page > 1) {
@@ -456,10 +487,16 @@ const handleBatchDelete = async () => {
 const handleBatchEditConfirm = async (values: Record<string, any>) => {
   batchEditLoading.value = true
   try {
+    const affectedNames = selectedIds.value
+      .map(id => data.value?.list.find(c => c.id === id))
+      .filter(Boolean)
+      .map(c => c!.name)
     if (batchEditType.value === 'category') {
       await mockBatchUpdateConsumableCategory(selectedIds.value, values.category)
+      auditLog.logConsumableBatchUpdate(selectedIds.value, affectedNames, '分类', '', values.category)
     } else if (batchEditType.value === 'location') {
       await mockBatchUpdateConsumableLocation(selectedIds.value, values.location)
+      auditLog.logConsumableBatchUpdate(selectedIds.value, affectedNames, '库位', '', values.location)
     }
     showBatchEditDialog.value = false
     clearSelection()
@@ -477,6 +514,7 @@ const handleBatchImport = async (file: File) => {
   importResult.value = null
   try {
     const result = await mockBatchImportConsumables(file)
+    auditLog.logReagentImport(result.total, `导入文件: ${file.name}, 成功${result.success}条, 失败${result.failed}条`)
     importResult.value = result
     fetchData()
   } catch (e: any) {
