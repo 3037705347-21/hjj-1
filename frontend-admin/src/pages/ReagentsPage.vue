@@ -3,7 +3,6 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   Plus,
-  Search,
   Edit2,
   Trash2,
   X,
@@ -21,6 +20,11 @@ import {
   ToggleRight,
   Download,
 } from 'lucide-vue-next'
+import DataTableFilter from '@/components/DataTableFilter.vue'
+import type { FilterField } from '@/components/DataTableFilter.vue'
+import { useSavedFilters } from '@/composables/useSavedFilters'
+import type { SavedFilter } from '@/composables/useSavedFilters'
+import { exportToCsv } from '@/utils/csv'
 import {
   mockGetReagents,
   mockCreateReagent,
@@ -46,15 +50,39 @@ const router = useRouter()
 const loading = ref(false)
 const data = ref<PageResult<Reagent> | null>(null)
 
-const searchForm = reactive({
+const filters = ref<Record<string, any>>({
   keyword: '',
   category: '',
   brand: '',
-  catalogNumber: '',
   hazardLevel: '',
   storageCondition: '',
   enabled: '',
+  manufacturer: '',
+  casNumber: '',
+  createTime: ['', ''],
+  updateTime: ['', ''],
 })
+
+const { savedFilters, addFilter, deleteFilter, loadFilters } = useSavedFilters('reagent_saved_filters')
+
+const filterFields: FilterField[] = [
+  { key: 'category', label: '分类', type: 'select', options: reagentCategories.map((c) => ({ label: c, value: c })) },
+  { key: 'brand', label: '品牌', type: 'select', options: commonBrands.map((b) => ({ label: b, value: b })) },
+  { key: 'hazardLevel', label: '危险等级', type: 'select', options: [
+    { label: '低危', value: 'low' },
+    { label: '中危', value: 'medium' },
+    { label: '高危', value: 'high' },
+  ]},
+  { key: 'storageCondition', label: '存储条件', type: 'select', options: storageConditions.map((s) => ({ label: s, value: s })) },
+  { key: 'enabled', label: '启用状态', type: 'select', options: [
+    { label: '启用', value: 'true' },
+    { label: '停用', value: 'false' },
+  ]},
+  { key: 'manufacturer', label: '生产厂家', type: 'input', placeholder: '输入厂家名称' },
+  { key: 'casNumber', label: 'CAS号', type: 'input', placeholder: '输入CAS号' },
+  { key: 'createTime', label: '创建时间', type: 'date-range' },
+  { key: 'updateTime', label: '更新时间', type: 'date-range' },
+]
 
 const pagination = reactive({
   page: 1,
@@ -99,16 +127,22 @@ const formData = reactive<ReagentFormData>(defaultFormData())
 const fetchData = async () => {
   loading.value = true
   try {
-    const filters = {
-      keyword: searchForm.keyword || undefined,
-      category: searchForm.category || undefined,
-      brand: searchForm.brand || undefined,
-      catalogNumber: searchForm.catalogNumber || undefined,
-      hazardLevel: searchForm.hazardLevel || undefined,
-      storageCondition: searchForm.storageCondition || undefined,
-      enabled: searchForm.enabled || undefined,
+    const f = filters.value
+    const params = {
+      keyword: f.keyword || undefined,
+      category: f.category || undefined,
+      brand: f.brand || undefined,
+      hazardLevel: f.hazardLevel || undefined,
+      storageCondition: f.storageCondition || undefined,
+      enabled: f.enabled || undefined,
+      manufacturer: f.manufacturer || undefined,
+      casNumber: f.casNumber || undefined,
+      createTimeStart: f.createTime?.[0] || undefined,
+      createTimeEnd: f.createTime?.[1] || undefined,
+      updateTimeStart: f.updateTime?.[0] || undefined,
+      updateTimeEnd: f.updateTime?.[1] || undefined,
     }
-    const result = await mockGetReagents(pagination.page, pagination.pageSize, filters)
+    const result = await mockGetReagents(pagination.page, pagination.pageSize, params)
     data.value = result
   } finally {
     loading.value = false
@@ -121,15 +155,52 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  searchForm.keyword = ''
-  searchForm.category = ''
-  searchForm.brand = ''
-  searchForm.catalogNumber = ''
-  searchForm.hazardLevel = ''
-  searchForm.storageCondition = ''
-  searchForm.enabled = ''
   pagination.page = 1
   fetchData()
+}
+
+const handleSaveFilter = (name: string) => {
+  addFilter(name, filters.value)
+  alert('筛选条件已保存')
+}
+
+const handleApplyFilter = (filter: SavedFilter) => {
+  filters.value = { ...filter.values }
+  pagination.page = 1
+  fetchData()
+}
+
+const handleDeleteFilter = (id: string) => {
+  if (confirm('确定要删除该筛选条件吗？')) {
+    deleteFilter(id)
+  }
+}
+
+const handleExport = () => {
+  if (!data.value?.list.length) {
+    alert('暂无数据可导出')
+    return
+  }
+  const columns = [
+    { key: 'name', label: '试剂名称' },
+    { key: 'casNumber', label: 'CAS号' },
+    { key: 'category', label: '分类' },
+    { key: 'brand', label: '品牌' },
+    { key: 'catalogNumber', label: '货号' },
+    { key: 'manufacturer', label: '生产厂家' },
+    { key: 'specification', label: '规格' },
+    { key: 'unit', label: '单位' },
+    { key: 'storageCondition', label: '存储条件' },
+    { key: 'hazardLevel', label: '危险等级', formatter: (v: string) => hazardLevelLabels[v as keyof typeof hazardLevelLabels] || v },
+    { key: 'enabled', label: '状态', formatter: (v: boolean) => enabledStatusLabels[String(v) as 'true' | 'false'] },
+    { key: 'createdAt', label: '创建时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+    { key: 'updatedAt', label: '更新时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+  ]
+  exportToCsv(data.value.list, columns, `试剂列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
+}
+
+const handleAction = () => {
+  openCreateModal()
 }
 
 const handlePageChange = (page: number) => {
@@ -315,116 +386,21 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="bg-white rounded-xl shadow-card p-6">
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div class="lg:col-span-2">
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">关键词搜索</label>
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search class="w-4 h-4 text-gray-400" />
-            </div>
-            <input
-              v-model="searchForm.keyword"
-              type="text"
-              placeholder="搜索试剂名称、CAS号、生产厂家..."
-              class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              @keyup.enter="handleSearch"
-            >
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">分类</label>
-          <select
-            v-model="searchForm.category"
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-          >
-            <option value="">全部分类</option>
-            <option v-for="cat in reagentCategories" :key="cat" :value="cat">{{ cat }}</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">品牌</label>
-          <select
-            v-model="searchForm.brand"
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-          >
-            <option value="">全部品牌</option>
-            <option v-for="b in commonBrands" :key="b" :value="b">{{ b }}</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">货号</label>
-          <input
-            v-model="searchForm.catalogNumber"
-            type="text"
-            placeholder="输入货号关键词..."
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-          >
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">危险等级</label>
-          <select
-            v-model="searchForm.hazardLevel"
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-          >
-            <option value="">全部等级</option>
-            <option value="low">低危</option>
-            <option value="medium">中危</option>
-            <option value="high">高危</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">存储条件</label>
-          <select
-            v-model="searchForm.storageCondition"
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-          >
-            <option value="">全部条件</option>
-            <option v-for="sc in storageConditions" :key="sc" :value="sc">{{ sc }}</option>
-          </select>
-        </div>
-
-        <div>
-          <label class="block text-xs font-medium text-gray-500 mb-1.5">启用状态</label>
-          <select
-            v-model="searchForm.enabled"
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-          >
-            <option value="">全部状态</option>
-            <option value="true">启用</option>
-            <option value="false">停用</option>
-          </select>
-        </div>
-      </div>
-
-      <div class="flex items-center gap-3 mt-5 pt-4 border-t border-gray-100">
-        <button
-          class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-          @click="handleSearch"
-        >
-          搜索
-        </button>
-        <button
-          class="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
-          @click="handleReset"
-        >
-          重置
-        </button>
-        <div class="flex-1"></div>
-        <button
-          class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all flex items-center gap-2 shadow-md shadow-primary-500/20"
-          @click="openCreateModal"
-        >
-          <Plus class="w-4 h-4" />
-          新增试剂
-        </button>
-      </div>
-    </div>
+    <DataTableFilter
+      v-model="filters"
+      :filter-fields="filterFields"
+      :saved-filters="savedFilters"
+      :show-export="true"
+      action-button-text="新增试剂"
+      keyword-placeholder="搜索试剂名称、CAS号、批次号、厂家、货号、库位..."
+      @search="handleSearch"
+      @reset="handleReset"
+      @export="handleExport"
+      @action="handleAction"
+      @save-filter="handleSaveFilter"
+      @apply-filter="handleApplyFilter"
+      @delete-filter="handleDeleteFilter"
+    />
 
     <div class="bg-white rounded-xl shadow-card overflow-hidden">
       <div

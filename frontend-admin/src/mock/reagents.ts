@@ -12,6 +12,13 @@ export interface ReagentFilterParams {
   hazardLevel?: string
   storageCondition?: string
   enabled?: string
+  manufacturer?: string
+  casNumber?: string
+  createTimeStart?: string
+  createTimeEnd?: string
+  updateTimeStart?: string
+  updateTimeEnd?: string
+  operator?: string
 }
 
 function getReagentsFromStorage(): Reagent[] {
@@ -312,49 +319,100 @@ export function mockGetReagents(
   return new Promise((resolve) => {
     setTimeout(() => {
       let reagents = getReagentsFromStorage()
-      
+
       if (filters) {
-        const { keyword, category, brand, catalogNumber, hazardLevel, storageCondition, enabled } = filters
-        
+        const {
+          keyword,
+          category,
+          brand,
+          catalogNumber,
+          hazardLevel,
+          storageCondition,
+          enabled,
+          manufacturer,
+          casNumber,
+          createTimeStart,
+          createTimeEnd,
+          updateTimeStart,
+          updateTimeEnd,
+        } = filters
+
         if (keyword) {
           const kw = keyword.toLowerCase()
           reagents = reagents.filter(
-            r => r.name.toLowerCase().includes(kw) || 
-                 r.casNumber?.toLowerCase().includes(kw) ||
-                 r.manufacturer?.toLowerCase().includes(kw)
+            (r) =>
+              r.name.toLowerCase().includes(kw) ||
+              r.casNumber?.toLowerCase().includes(kw) ||
+              r.manufacturer?.toLowerCase().includes(kw) ||
+              r.brand?.toLowerCase().includes(kw) ||
+              r.catalogNumber?.toLowerCase().includes(kw) ||
+              r.aliases?.toLowerCase().includes(kw) ||
+              r.description?.toLowerCase().includes(kw)
           )
         }
-        
+
         if (category) {
-          reagents = reagents.filter(r => r.category === category)
+          reagents = reagents.filter((r) => r.category === category)
         }
-        
+
         if (brand) {
-          reagents = reagents.filter(r => r.brand === brand)
+          reagents = reagents.filter((r) => r.brand === brand)
         }
-        
+
         if (catalogNumber) {
           const cn = catalogNumber.toLowerCase()
-          reagents = reagents.filter(r => r.catalogNumber?.toLowerCase().includes(cn))
+          reagents = reagents.filter((r) => r.catalogNumber?.toLowerCase().includes(cn))
         }
-        
+
         if (hazardLevel) {
-          reagents = reagents.filter(r => r.hazardLevel === hazardLevel)
+          reagents = reagents.filter((r) => r.hazardLevel === hazardLevel)
         }
-        
+
         if (storageCondition) {
-          reagents = reagents.filter(r => r.storageCondition === storageCondition)
+          reagents = reagents.filter((r) => r.storageCondition === storageCondition)
         }
-        
+
         if (enabled !== undefined && enabled !== '') {
           const enabledBool = enabled === 'true'
-          reagents = reagents.filter(r => r.enabled === enabledBool)
+          reagents = reagents.filter((r) => r.enabled === enabledBool)
+        }
+
+        if (manufacturer) {
+          const mf = manufacturer.toLowerCase()
+          reagents = reagents.filter((r) => r.manufacturer?.toLowerCase().includes(mf))
+        }
+
+        if (casNumber) {
+          const cn = casNumber.toLowerCase()
+          reagents = reagents.filter((r) => r.casNumber?.toLowerCase().includes(cn))
+        }
+
+        if (createTimeStart) {
+          const start = new Date(createTimeStart).getTime()
+          reagents = reagents.filter((r) => new Date(r.createdAt).getTime() >= start)
+        }
+
+        if (createTimeEnd) {
+          const end = new Date(createTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          reagents = reagents.filter((r) => new Date(r.createdAt).getTime() < end)
+        }
+
+        if (updateTimeStart) {
+          const start = new Date(updateTimeStart).getTime()
+          reagents = reagents.filter((r) => new Date(r.updatedAt).getTime() >= start)
+        }
+
+        if (updateTimeEnd) {
+          const end = new Date(updateTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          reagents = reagents.filter((r) => new Date(r.updatedAt).getTime() < end)
         }
       }
-      
+
+      reagents.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+
       const start = (page - 1) * pageSize
       const list = reagents.slice(start, start + pageSize)
-      
+
       resolve({
         list,
         total: reagents.length,

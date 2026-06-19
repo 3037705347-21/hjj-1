@@ -309,11 +309,25 @@ function initMockOperations(batches: ReagentBatch[]): void {
   saveOperationsToStorage(operations)
 }
 
+export interface BatchFilterParams {
+  keyword?: string
+  reagentId?: string
+  status?: string
+  storageLocation?: string
+  productionDateStart?: string
+  productionDateEnd?: string
+  expiryDateStart?: string
+  expiryDateEnd?: string
+  receivedDateStart?: string
+  receivedDateEnd?: string
+  storageCondition?: string
+  operator?: string
+}
+
 export async function mockGetBatches(
   page: number = 1,
   pageSize: number = 10,
-  reagentId?: string,
-  status?: string
+  filters?: BatchFilterParams
 ): Promise<PageResult<ReagentBatch>> {
   return new Promise((resolve) => {
     setTimeout(async () => {
@@ -322,12 +336,89 @@ export async function mockGetBatches(
       batches = batches.map(updateBatchStatus)
       saveBatchesToStorage(batches)
 
-      if (reagentId) {
-        batches = batches.filter((b) => b.reagentId === reagentId)
-      }
+      const reagents = await mockGetAllReagents()
+      const reagentMap = new Map(reagents.map((r) => [r.id, r]))
 
-      if (status) {
-        batches = batches.filter((b) => b.status === status)
+      if (filters) {
+        const {
+          keyword,
+          reagentId,
+          status,
+          storageLocation,
+          productionDateStart,
+          productionDateEnd,
+          expiryDateStart,
+          expiryDateEnd,
+          receivedDateStart,
+          receivedDateEnd,
+          storageCondition,
+        } = filters
+
+        if (keyword) {
+          const kw = keyword.toLowerCase()
+          batches = batches.filter((b) => {
+            const reagent = reagentMap.get(b.reagentId)
+            return (
+              b.batchNumber.toLowerCase().includes(kw) ||
+              b.storageLocation.toLowerCase().includes(kw) ||
+              reagent?.name.toLowerCase().includes(kw) ||
+              reagent?.casNumber?.toLowerCase().includes(kw) ||
+              reagent?.manufacturer?.toLowerCase().includes(kw) ||
+              reagent?.brand?.toLowerCase().includes(kw) ||
+              reagent?.catalogNumber?.toLowerCase().includes(kw)
+            )
+          })
+        }
+
+        if (reagentId) {
+          batches = batches.filter((b) => b.reagentId === reagentId)
+        }
+
+        if (status) {
+          batches = batches.filter((b) => b.status === status)
+        }
+
+        if (storageLocation) {
+          const sl = storageLocation.toLowerCase()
+          batches = batches.filter((b) => b.storageLocation.toLowerCase().includes(sl))
+        }
+
+        if (storageCondition) {
+          batches = batches.filter((b) => {
+            const reagent = reagentMap.get(b.reagentId)
+            return reagent?.storageCondition === storageCondition
+          })
+        }
+
+        if (productionDateStart) {
+          const start = new Date(productionDateStart).getTime()
+          batches = batches.filter((b) => new Date(b.productionDate).getTime() >= start)
+        }
+
+        if (productionDateEnd) {
+          const end = new Date(productionDateEnd).getTime() + 24 * 60 * 60 * 1000
+          batches = batches.filter((b) => new Date(b.productionDate).getTime() < end)
+        }
+
+        if (expiryDateStart) {
+          const start = new Date(expiryDateStart).getTime()
+          batches = batches.filter((b) => new Date(b.expiryDate).getTime() >= start)
+        }
+
+        if (expiryDateEnd) {
+          const end = new Date(expiryDateEnd).getTime() + 24 * 60 * 60 * 1000
+          batches = batches.filter((b) => new Date(b.expiryDate).getTime() < end)
+        }
+
+        if (receivedDateStart) {
+          const start = new Date(receivedDateStart).getTime()
+          batches = batches.filter((b) => new Date(b.receivedDate).getTime() >= start)
+        }
+
+        if (receivedDateEnd) {
+          const end = new Date(receivedDateEnd).getTime() + 24 * 60 * 60 * 1000
+          batches = batches.filter((b) => new Date(b.receivedDate).getTime() < end)
+        }
       }
 
       batches.sort((a, b) => {
@@ -342,9 +433,6 @@ export async function mockGetBatches(
         if (orderDiff !== 0) return orderDiff
         return new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime()
       })
-
-      const reagents = await mockGetAllReagents()
-      const reagentMap = new Map(reagents.map((r) => [r.id, r]))
 
       batches = batches.map((batch) => {
         const reagent = reagentMap.get(batch.reagentId)

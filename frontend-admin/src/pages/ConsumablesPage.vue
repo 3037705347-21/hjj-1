@@ -24,6 +24,11 @@ import {
   History,
   Boxes,
 } from 'lucide-vue-next'
+import DataTableFilter from '@/components/DataTableFilter.vue'
+import type { FilterField } from '@/components/DataTableFilter.vue'
+import { useSavedFilters } from '@/composables/useSavedFilters'
+import type { SavedFilter } from '@/composables/useSavedFilters'
+import { exportToCsv } from '@/utils/csv'
 import {
   mockGetConsumables,
   mockCreateConsumable,
@@ -58,10 +63,29 @@ const data = ref<PageResult<Consumable> | null>(null)
 const operationsLoading = ref(false)
 const operationsData = ref<PageResult<ConsumableOperation> | null>(null)
 
-const searchForm = reactive({
+const filters = ref<Record<string, any>>({
   keyword: '',
   category: '',
+  location: '',
+  manufacturer: '',
+  stockStatus: '',
+  createTime: ['', ''],
+  updateTime: ['', ''],
 })
+
+const { savedFilters, addFilter, deleteFilter, loadFilters } = useSavedFilters('consumable_saved_filters')
+
+const filterFields: FilterField[] = [
+  { key: 'category', label: '分类', type: 'select', options: consumableCategories.map((c) => ({ label: c, value: c })) },
+  { key: 'manufacturer', label: '厂家', type: 'input', placeholder: '输入厂家名称' },
+  { key: 'location', label: '库位', type: 'input', placeholder: '输入库位关键词' },
+  { key: 'stockStatus', label: '库存状态', type: 'select', options: [
+    { label: '库存充足', value: 'normal' },
+    { label: '库存不足', value: 'low' },
+  ]},
+  { key: 'createTime', label: '创建时间', type: 'date-range' },
+  { key: 'updateTime', label: '更新时间', type: 'date-range' },
+]
 
 const operationSearchForm = reactive({
   keyword: '',
@@ -105,12 +129,19 @@ const currentOperationConsumable = ref<Consumable | null>(null)
 const fetchData = async () => {
   loading.value = true
   try {
-    const result = await mockGetConsumables(
-      pagination.page,
-      pagination.pageSize,
-      searchForm.keyword,
-      searchForm.category
-    )
+    const f = filters.value
+    const params = {
+      keyword: f.keyword || undefined,
+      category: f.category || undefined,
+      location: f.location || undefined,
+      manufacturer: f.manufacturer || undefined,
+      stockStatus: f.stockStatus || undefined,
+      createTimeStart: f.createTime?.[0] || undefined,
+      createTimeEnd: f.createTime?.[1] || undefined,
+      updateTimeStart: f.updateTime?.[0] || undefined,
+      updateTimeEnd: f.updateTime?.[1] || undefined,
+    }
+    const result = await mockGetConsumables(pagination.page, pagination.pageSize, params)
     data.value = result
   } finally {
     loading.value = false
@@ -151,10 +182,50 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  searchForm.keyword = ''
-  searchForm.category = ''
   pagination.page = 1
   fetchData()
+}
+
+const handleSaveFilter = (name: string) => {
+  addFilter(name, filters.value)
+  alert('筛选条件已保存')
+}
+
+const handleApplyFilter = (filter: SavedFilter) => {
+  filters.value = { ...filter.values }
+  pagination.page = 1
+  fetchData()
+}
+
+const handleDeleteFilter = (id: string) => {
+  if (confirm('确定要删除该筛选条件吗？')) {
+    deleteFilter(id)
+  }
+}
+
+const handleExport = () => {
+  if (!data.value?.list.length) {
+    alert('暂无数据可导出')
+    return
+  }
+  const columns = [
+    { key: 'name', label: '耗材名称' },
+    { key: 'category', label: '分类' },
+    { key: 'specification', label: '规格' },
+    { key: 'unit', label: '单位' },
+    { key: 'stockQuantity', label: '当前库存' },
+    { key: 'safetyStock', label: '安全库存' },
+    { key: 'manufacturer', label: '生产厂家' },
+    { key: 'location', label: '库位' },
+    { key: 'description', label: '描述' },
+    { key: 'createdAt', label: '创建时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+    { key: 'updatedAt', label: '更新时间', formatter: (v: string) => formatDate(v, 'YYYY-MM-DD HH:mm') },
+  ]
+  exportToCsv(data.value.list, columns, `耗材列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
+}
+
+const handleAction = () => {
+  openCreateModal()
 }
 
 const handleOperationSearch = () => {
@@ -350,60 +421,23 @@ onMounted(() => {
       </div>
 
       <div v-if="activeTab === 'list'" class="p-6">
-        <div class="flex flex-wrap items-center gap-4 mb-6">
-          <div class="flex-1 min-w-[200px]">
-            <div class="relative">
-              <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                <Search class="w-4 h-4 text-gray-400" />
-              </div>
-              <input
-                v-model="searchForm.keyword"
-                type="text"
-                placeholder="搜索耗材名称、生产厂家..."
-                class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-                @keyup.enter="handleSearch"
-              >
-            </div>
-          </div>
-
-          <select
-            v-model="searchForm.category"
-            class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-          >
-            <option value="">
-              全部分类
-            </option>
-            <option
-              v-for="cat in consumableCategories"
-              :key="cat"
-              :value="cat"
-            >
-              {{ cat }}
-            </option>
-          </select>
-
-          <button
-            class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-            @click="handleSearch"
-          >
-            搜索
-          </button>
-
-          <button
-            class="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
-            @click="handleReset"
-          >
-            重置
-          </button>
-
-          <button
-            class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all flex items-center gap-2 shadow-md shadow-primary-500/20"
-            @click="openCreateModal"
-          >
-            <Plus class="w-4 h-4" />
-            新增耗材
-          </button>
-        </div>
+        <DataTableFilter
+          v-model="filters"
+          :filter-fields="filterFields"
+          :saved-filters="savedFilters"
+          :show-export="true"
+          :plain="true"
+          action-button-text="新增耗材"
+          keyword-placeholder="搜索耗材名称、厂家、货号、库位..."
+          class="mb-6"
+          @search="handleSearch"
+          @reset="handleReset"
+          @export="handleExport"
+          @action="handleAction"
+          @save-filter="handleSaveFilter"
+          @apply-filter="handleApplyFilter"
+          @delete-filter="handleDeleteFilter"
+        />
 
         <div v-if="loading" class="p-16 flex items-center justify-center">
           <div class="animate-spin w-8 h-8 border-2 border-primary-500 border-t-transparent rounded-full" />

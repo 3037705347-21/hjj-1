@@ -3,7 +3,6 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   Plus,
-  Search,
   X,
   Eye,
   ArrowDownCircle,
@@ -29,6 +28,11 @@ import {
   CalendarClock,
   ChevronDown,
 } from 'lucide-vue-next'
+import DataTableFilter from '@/components/DataTableFilter.vue'
+import type { FilterField } from '@/components/DataTableFilter.vue'
+import { useSavedFilters } from '@/composables/useSavedFilters'
+import type { SavedFilter } from '@/composables/useSavedFilters'
+import { exportToCsv } from '@/utils/csv'
 import {
   mockGetBatches,
   mockCreateBatch,
@@ -50,6 +54,7 @@ import {
   operationTypeColors,
   operationTypeConfigs,
 } from '@/types/batch'
+import { storageConditions } from '@/types/reagent'
 import type { PageResult } from '@/types/common'
 import type { Reagent } from '@/types/reagent'
 import { formatDate, getExpiryDays } from '@/utils/date'
@@ -60,15 +65,51 @@ const loading = ref(false)
 const data = ref<PageResult<ReagentBatch> | null>(null)
 const reagents = ref<Reagent[]>([])
 
-const searchForm = reactive({
+const filters = ref<Record<string, any>>({
   keyword: '',
   status: '',
   reagentId: '',
+  storageLocation: '',
+  storageCondition: '',
+  receivedDate: ['', ''],
+  productionDate: ['', ''],
+  expiryDate: ['', ''],
+  operator: '',
 })
+
+const { savedFilters, addFilter, deleteFilter, loadFilters } = useSavedFilters('batch_saved_filters')
+
+const filterFields: FilterField[] = [
+  { key: 'reagentId', label: '关联试剂', type: 'select', options: [] },
+  { key: 'status', label: '库存状态', type: 'select', options: [
+    { label: '正常', value: 'normal' },
+    { label: '已用完', value: 'depleted' },
+    { label: '临期', value: 'expiring' },
+    { label: '过期', value: 'expired' },
+  ]},
+  { key: 'storageCondition', label: '存储条件', type: 'select', options: storageConditions.map((s) => ({ label: s, value: s })) },
+  { key: 'storageLocation', label: '库位', type: 'input', placeholder: '输入库位关键词' },
+  { key: 'operator', label: '操作人', type: 'input', placeholder: '输入操作人' },
+  { key: 'productionDate', label: '生产日期', type: 'date-range' },
+  { key: 'expiryDate', label: '有效期', type: 'date-range' },
+  { key: 'receivedDate', label: '入库日期', type: 'date-range' },
+]
 
 const pagination = reactive({
   page: 1,
   pageSize: 10,
+})
+
+const dynamicFilterFields = computed<FilterField[]>(() => {
+  return filterFields.map((f) => {
+    if (f.key === 'reagentId') {
+      return {
+        ...f,
+        options: reagents.value.map((r) => ({ label: r.name, value: r.id })),
+      }
+    }
+    return f
+  })
 })
 
 const showCreateModal = ref(false)
@@ -105,12 +146,22 @@ const openMoreMenuBatchId = ref<string | null>(null)
 const fetchData = async () => {
   loading.value = true
   try {
-    const result = await mockGetBatches(
-      pagination.page,
-      pagination.pageSize,
-      searchForm.reagentId || undefined,
-      searchForm.status || undefined
-    )
+    const f = filters.value
+    const params = {
+      keyword: f.keyword || undefined,
+      reagentId: f.reagentId || undefined,
+      status: f.status || undefined,
+      storageLocation: f.storageLocation || undefined,
+      storageCondition: f.storageCondition || undefined,
+      operator: f.operator || undefined,
+      productionDateStart: f.productionDate?.[0] || undefined,
+      productionDateEnd: f.productionDate?.[1] || undefined,
+      expiryDateStart: f.expiryDate?.[0] || undefined,
+      expiryDateEnd: f.expiryDate?.[1] || undefined,
+      receivedDateStart: f.receivedDate?.[0] || undefined,
+      receivedDateEnd: f.receivedDate?.[1] || undefined,
+    }
+    const result = await mockGetBatches(pagination.page, pagination.pageSize, params)
     data.value = result
   } finally {
     loading.value = false
@@ -127,11 +178,50 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
-  searchForm.keyword = ''
-  searchForm.status = ''
-  searchForm.reagentId = ''
   pagination.page = 1
   fetchData()
+}
+
+const handleSaveFilter = (name: string) => {
+  addFilter(name, filters.value)
+  alert('筛选条件已保存')
+}
+
+const handleApplyFilter = (filter: SavedFilter) => {
+  filters.value = { ...filter.values }
+  pagination.page = 1
+  fetchData()
+}
+
+const handleDeleteFilter = (id: string) => {
+  if (confirm('确定要删除该筛选条件吗？')) {
+    deleteFilter(id)
+  }
+}
+
+const handleExport = () => {
+  if (!data.value?.list.length) {
+    alert('暂无数据可导出')
+    return
+  }
+  const columns = [
+    { key: 'batchNumber', label: '批次号' },
+    { key: 'reagentName', label: '试剂名称' },
+    { key: 'status', label: '状态', formatter: (v: string) => batchStatusLabels[v as keyof typeof batchStatusLabels] || v },
+    { key: 'currentQuantity', label: '当前数量' },
+    { key: 'initialQuantity', label: '初始数量' },
+    { key: 'productionDate', label: '生产日期' },
+    { key: 'expiryDate', label: '有效期' },
+    { key: 'receivedDate', label: '入库日期' },
+    { key: 'storageLocation', label: '库位' },
+    { key: 'operator', label: '操作人' },
+    { key: 'remark', label: '备注' },
+  ]
+  exportToCsv(data.value.list, columns, `批次列表_${formatDate(new Date(), 'YYYYMMDD')}.csv`)
+}
+
+const handleAction = () => {
+  showCreateModal.value = true
 }
 
 const handlePageChange = (page: number) => {
@@ -146,7 +236,7 @@ const totalPages = computed(() => {
 
 const openCreateModal = () => {
   Object.assign(createForm, {
-    reagentId: searchForm.reagentId || (reagents.value[0]?.id || ''),
+    reagentId: filters.value.reagentId || (reagents.value[0]?.id || ''),
     batchNumber: '',
     productionDate: '',
     expiryDate: '',
@@ -295,7 +385,7 @@ const getUsagePercentage = (batch: ReagentBatch) => {
 }
 
 const filterByReagent = (reagentId: string) => {
-  searchForm.reagentId = reagentId
+  filters.value.reagentId = filters.value.reagentId === reagentId ? '' : reagentId
   pagination.page = 1
   fetchData()
 }
@@ -340,7 +430,7 @@ watch(
   () => route.query.reagentId,
   (val) => {
     if (val && typeof val === 'string') {
-      searchForm.reagentId = val
+      filters.value.reagentId = val
     }
   },
   { immediate: true }
@@ -357,93 +447,28 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="bg-white rounded-xl shadow-card p-6">
-      <div class="flex flex-wrap items-center gap-4">
-        <div class="flex-1 min-w-[200px]">
-          <div class="relative">
-            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Search class="w-4 h-4 text-gray-400" />
-            </div>
-            <input
-              v-model="searchForm.keyword"
-              type="text"
-              placeholder="搜索批次号、试剂名称..."
-              class="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              @keyup.enter="handleSearch"
-            >
-          </div>
-        </div>
-
-        <select
-          v-model="searchForm.reagentId"
-          class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white min-w-[180px]"
-        >
-          <option value="">
-            全部试剂
-          </option>
-          <option
-            v-for="r in reagents"
-            :key="r.id"
-            :value="r.id"
-          >
-            {{ r.name }}
-          </option>
-        </select>
-
-        <select
-          v-model="searchForm.status"
-          class="px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
-        >
-          <option value="">
-            全部状态
-          </option>
-          <option value="normal">
-            正常
-          </option>
-          <option value="warning">
-            近效期
-          </option>
-          <option value="expired">
-            已过期
-          </option>
-          <option value="frozen">
-            已冻结
-          </option>
-          <option value="exhausted">
-            已耗尽
-          </option>
-        </select>
-
-        <button
-          class="px-5 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors"
-          @click="handleSearch"
-        >
-          搜索
-        </button>
-
-        <button
-          class="px-5 py-2.5 border border-gray-200 hover:bg-gray-50 text-gray-600 rounded-lg transition-colors"
-          @click="handleReset"
-        >
-          重置
-        </button>
-
-        <button
-          class="px-5 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 hover:from-primary-700 hover:to-primary-800 text-white rounded-lg transition-all flex items-center gap-2 shadow-md shadow-primary-500/20"
-          @click="openCreateModal"
-        >
-          <Plus class="w-4 h-4" />
-          录入批次
-        </button>
-      </div>
-    </div>
+    <DataTableFilter
+      v-model="filters"
+      :filter-fields="dynamicFilterFields"
+      :saved-filters="savedFilters"
+      :show-export="true"
+      action-button-text="录入批次"
+      keyword-placeholder="搜索批次号、试剂名称、CAS号、厂家、货号、库位..."
+      @search="handleSearch"
+      @reset="handleReset"
+      @export="handleExport"
+      @action="handleAction"
+      @save-filter="handleSaveFilter"
+      @apply-filter="handleApplyFilter"
+      @delete-filter="handleDeleteFilter"
+    />
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
       <div
         v-for="r in reagents.slice(0, 4)"
         :key="r.id"
         class="bg-white rounded-xl p-4 shadow-card cursor-pointer hover:shadow-card-hover transition-all duration-200"
-        :class="{ 'ring-2 ring-primary-500': searchForm.reagentId === r.id }"
+        :class="{ 'ring-2 ring-primary-500': filters.reagentId === r.id }"
         @click="filterByReagent(r.id)"
       >
         <div class="text-sm text-gray-500 mb-1">

@@ -319,27 +319,93 @@ function initMockOperations(): ConsumableOperation[] {
   return operations
 }
 
+export interface ConsumableFilterParams {
+  keyword?: string
+  category?: string
+  location?: string
+  manufacturer?: string
+  stockStatus?: 'low' | 'normal' | ''
+  createTimeStart?: string
+  createTimeEnd?: string
+  updateTimeStart?: string
+  updateTimeEnd?: string
+}
+
 export function mockGetConsumables(
   page: number = 1,
   pageSize: number = 10,
-  keyword?: string,
-  category?: string
+  filters?: ConsumableFilterParams
 ): Promise<PageResult<Consumable>> {
   return new Promise((resolve) => {
     setTimeout(() => {
       let consumables = getConsumablesFromStorage()
 
-      if (keyword) {
-        const kw = keyword.toLowerCase()
-        consumables = consumables.filter(
-          (c) =>
-            c.name.toLowerCase().includes(kw) ||
-            c.manufacturer?.toLowerCase().includes(kw)
-        )
-      }
+      if (filters) {
+        const {
+          keyword,
+          category,
+          location,
+          manufacturer,
+          stockStatus,
+          createTimeStart,
+          createTimeEnd,
+          updateTimeStart,
+          updateTimeEnd,
+        } = filters
 
-      if (category) {
-        consumables = consumables.filter((c) => c.category === category)
+        if (keyword) {
+          const kw = keyword.toLowerCase()
+          consumables = consumables.filter(
+            (c) =>
+              c.name.toLowerCase().includes(kw) ||
+              c.manufacturer?.toLowerCase().includes(kw) ||
+              c.location?.toLowerCase().includes(kw) ||
+              c.description?.toLowerCase().includes(kw) ||
+              c.specification.toLowerCase().includes(kw)
+          )
+        }
+
+        if (category) {
+          consumables = consumables.filter((c) => c.category === category)
+        }
+
+        if (location) {
+          const loc = location.toLowerCase()
+          consumables = consumables.filter((c) => c.location?.toLowerCase().includes(loc))
+        }
+
+        if (manufacturer) {
+          const mf = manufacturer.toLowerCase()
+          consumables = consumables.filter((c) => c.manufacturer?.toLowerCase().includes(mf))
+        }
+
+        if (stockStatus) {
+          if (stockStatus === 'low') {
+            consumables = consumables.filter((c) => c.stockQuantity <= c.safetyStock)
+          } else if (stockStatus === 'normal') {
+            consumables = consumables.filter((c) => c.stockQuantity > c.safetyStock)
+          }
+        }
+
+        if (createTimeStart) {
+          const start = new Date(createTimeStart).getTime()
+          consumables = consumables.filter((c) => new Date(c.createdAt).getTime() >= start)
+        }
+
+        if (createTimeEnd) {
+          const end = new Date(createTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          consumables = consumables.filter((c) => new Date(c.createdAt).getTime() < end)
+        }
+
+        if (updateTimeStart) {
+          const start = new Date(updateTimeStart).getTime()
+          consumables = consumables.filter((c) => new Date(c.updatedAt).getTime() >= start)
+        }
+
+        if (updateTimeEnd) {
+          const end = new Date(updateTimeEnd).getTime() + 24 * 60 * 60 * 1000
+          consumables = consumables.filter((c) => new Date(c.updatedAt).getTime() < end)
+        }
       }
 
       consumables.sort((a, b) => {
@@ -347,7 +413,7 @@ export function mockGetConsumables(
         const bLow = b.stockQuantity <= b.safetyStock
         if (aLow && !bLow) return -1
         if (!aLow && bLow) return 1
-        return a.name.localeCompare(b.name)
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
       })
 
       const start = (page - 1) * pageSize
