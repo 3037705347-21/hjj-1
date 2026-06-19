@@ -9,6 +9,15 @@ import ConsumablesPage from '@/pages/ConsumablesPage.vue'
 import ConsumableDetailPage from '@/pages/ConsumableDetailPage.vue'
 import AlertsPage from '@/pages/AlertsPage.vue'
 import { getUserStore } from '@/stores/user'
+import type { PermissionCode } from '@/types/permission'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    requiresAuth?: boolean
+    title?: string
+    permissions?: PermissionCode[]
+  }
+}
 
 const routes: RouteRecordRaw[] = [
   {
@@ -26,37 +35,37 @@ const routes: RouteRecordRaw[] = [
         path: '',
         name: 'dashboard',
         component: DashboardPage,
-        meta: { title: '仪表盘' },
+        meta: { title: '仪表盘', permissions: ['dashboard:view'] },
       },
       {
         path: 'reagents',
         name: 'reagents',
         component: ReagentsPage,
-        meta: { title: '试剂管理' },
+        meta: { title: '试剂管理', permissions: ['reagent:view'] },
       },
       {
         path: 'batches',
         name: 'batches',
         component: BatchesPage,
-        meta: { title: '试剂批管理' },
+        meta: { title: '试剂批管理', permissions: ['batch:view'] },
       },
       {
         path: 'consumables',
         name: 'consumables',
         component: ConsumablesPage,
-        meta: { title: '耗材管理' },
+        meta: { title: '耗材管理', permissions: ['consumable:view'] },
       },
       {
         path: 'consumables/:id',
         name: 'consumable-detail',
         component: ConsumableDetailPage,
-        meta: { title: '耗材详情' },
+        meta: { title: '耗材详情', permissions: ['consumable:view'] },
       },
       {
         path: 'alerts',
         name: 'alerts',
         component: AlertsPage,
-        meta: { title: '预警规则中心' },
+        meta: { title: '预警规则中心', permissions: ['alert:view'] },
       },
     ],
   },
@@ -67,8 +76,8 @@ const routes: RouteRecordRaw[] = [
       template: `
         <div class="min-h-screen flex items-center justify-center bg-gray-50">
           <div class="text-center">
-            <h1 class="text-6xl font-bold text-gray-300 mb-4">404</h1>
-            <p class="text-gray-500 mb-6">页面不存在</p>
+            <h1 class="text-6xl font-bold text-gray-300 mb-4">403</h1>
+            <p class="text-gray-500 mb-6">您没有权限访问该页面</p>
             <router-link to="/" class="px-6 py-2.5 bg-primary-600 hover:bg-primary-700 text-white rounded-lg transition-colors">
               返回首页
             </router-link>
@@ -87,9 +96,9 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const userStore = getUserStore()
   userStore.initFromStorage()
-  
+
   const requiresAuth = to.matched.some(record => record.meta.requiresAuth !== false)
-  
+
   if (requiresAuth && !userStore.isLoggedIn()) {
     next({
       path: '/login',
@@ -97,12 +106,23 @@ router.beforeEach((to, from, next) => {
     })
     return
   }
-  
+
   if (to.path === '/login' && userStore.isLoggedIn()) {
     next('/')
     return
   }
-  
+
+  if (userStore.isLoggedIn()) {
+    const requiredPermissions = to.meta.permissions
+    if (requiredPermissions && requiredPermissions.length > 0) {
+      const hasAccess = userStore.hasAnyPermission(requiredPermissions)
+      if (!hasAccess) {
+        next('/')
+        return
+      }
+    }
+  }
+
   next()
 })
 

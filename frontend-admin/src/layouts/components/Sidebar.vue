@@ -10,9 +10,14 @@ import {
   Menu,
   X,
   AlertTriangle,
+  Users,
+  Shield,
+  Settings,
 } from 'lucide-vue-next'
 import { getUserStore } from '@/stores/user'
 import { roleLabels } from '@/types/user'
+import { usePermission } from '@/composables/usePermission'
+import type { PermissionCode } from '@/types/permission'
 
 const props = defineProps<{
   collapsed: boolean
@@ -25,14 +30,32 @@ const emit = defineEmits<{
 const route = useRoute()
 const router = useRouter()
 const userStore = getUserStore()
+const permission = usePermission()
 
-const menuItems = [
-  { path: '/', name: '仪表盘', icon: LayoutDashboard },
-  { path: '/reagents', name: '试剂管理', icon: FlaskConical },
-  { path: '/batches', name: '试剂批管理', icon: TestTube },
-  { path: '/consumables', name: '耗材管理', icon: PackageOpen },
-  { path: '/alerts', name: '预警中心', icon: AlertTriangle },
+interface MenuItem {
+  path: string
+  name: string
+  icon: any
+  permission?: PermissionCode | PermissionCode[]
+}
+
+const allMenuItems: MenuItem[] = [
+  { path: '/', name: '仪表盘', icon: LayoutDashboard, permission: 'dashboard:view' },
+  { path: '/reagents', name: '试剂管理', icon: FlaskConical, permission: 'reagent:view' },
+  { path: '/batches', name: '试剂批管理', icon: TestTube, permission: 'batch:view' },
+  { path: '/consumables', name: '耗材管理', icon: PackageOpen, permission: 'consumable:view' },
+  { path: '/alerts', name: '预警中心', icon: AlertTriangle, permission: 'alert:view' },
+  { path: '/users', name: '用户管理', icon: Users, permission: 'user:manage' },
+  { path: '/roles', name: '角色管理', icon: Shield, permission: 'role:manage' },
+  { path: '/settings', name: '系统配置', icon: Settings, permission: 'system:config' },
 ]
+
+const menuItems = computed(() => {
+  return allMenuItems.filter(item => {
+    if (!item.permission) return true
+    return permission.hasPermission(item.permission)
+  })
+})
 
 const isActive = (path: string) => {
   if (path === '/') {
@@ -115,8 +138,11 @@ const handleLogout = async () => {
         <div class="text-sm font-medium truncate">
           {{ userStore.state.user?.name || '未登录' }}
         </div>
-        <div class="text-xs text-primary-200/60">
-          {{ userStore.state.user?.role ? roleLabels[userStore.state.user.role] : '' }}
+        <div class="text-xs text-primary-200/60 flex items-center gap-1 flex-wrap mt-0.5">
+          <span>{{ userStore.state.user?.role ? roleLabels[userStore.state.user.role] : '' }}</span>
+          <span v-if="permission.dataScopeLabel" class="inline-block px-1.5 py-0.5 rounded bg-white/10 text-primary-100/80">
+            {{ permission.dataScopeLabel }}
+          </span>
         </div>
       </div>
       <button

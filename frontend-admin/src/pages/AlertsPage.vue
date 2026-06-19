@@ -59,8 +59,10 @@ import {
 } from '@/mock/alerts'
 import type { PageResult } from '@/types/common'
 import { formatDate } from '@/utils/date'
+import { usePermission } from '@/composables/usePermission'
 
 const router = useRouter()
+const permission = usePermission()
 const activeTab = ref<'list' | 'rules'>('list')
 
 const loading = ref(false)
@@ -635,7 +637,7 @@ onMounted(() => {
                         </button>
                         <div class="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-xl border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
                           <button
-                            v-if="alert.status !== 'ignored' && alert.status !== 'resolved'"
+                            v-if="alert.status !== 'ignored' && alert.status !== 'resolved' && permission.canHandleAlert"
                             class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                             @click="openActionModal('ignore', alert)"
                           >
@@ -643,7 +645,7 @@ onMounted(() => {
                             忽略预警
                           </button>
                           <button
-                            v-if="alert.status !== 'resolved'"
+                            v-if="alert.status !== 'resolved' && permission.canAssignAlert"
                             class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                             @click="openActionModal('assign', alert)"
                           >
@@ -651,7 +653,7 @@ onMounted(() => {
                             转交处理
                           </button>
                           <button
-                            v-if="alert.status !== 'resolved' && alert.status !== 'ignored'"
+                            v-if="alert.status !== 'resolved' && alert.status !== 'ignored' && permission.canHandleAlert"
                             class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                             @click="openActionModal('resolve', alert)"
                           >
@@ -771,6 +773,7 @@ onMounted(() => {
                 </div>
               </div>
               <button
+                v-if="permission.canEditAlertRule"
                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors"
                 :class="rule.enabled ? 'bg-primary-600' : 'bg-gray-200'"
                 @click="handleRuleToggle(rule)"
@@ -790,6 +793,7 @@ onMounted(() => {
                 更新于 {{ formatDate(rule.updatedAt, 'MM-DD HH:mm') }}
               </div>
               <button
+                v-if="permission.canEditAlertRule"
                 class="text-sm text-primary-600 hover:text-primary-700 font-medium flex items-center gap-1"
                 @click="openRuleEdit(rule)"
               >
@@ -971,14 +975,14 @@ onMounted(() => {
           </button>
           <div class="flex items-center gap-2">
             <button
-              v-if="currentAlert?.status !== 'ignored' && currentAlert?.status !== 'resolved'"
+              v-if="currentAlert?.status !== 'ignored' && currentAlert?.status !== 'resolved' && permission.canHandleAlert"
               class="px-4 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors text-sm"
               @click="openActionModal('ignore', currentAlert!)"
             >
               忽略
             </button>
             <button
-              v-if="currentAlert?.status !== 'resolved'"
+              v-if="currentAlert?.status !== 'resolved' && permission.canAssignAlert"
               class="px-4 py-2.5 border border-gray-200 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors text-sm flex items-center gap-1.5"
               @click="openActionModal('assign', currentAlert!)"
             >
@@ -986,7 +990,7 @@ onMounted(() => {
               转交
             </button>
             <button
-              v-if="currentAlert?.status !== 'resolved' && currentAlert?.status !== 'ignored'"
+              v-if="currentAlert?.status !== 'resolved' && currentAlert?.status !== 'ignored' && permission.canHandleAlert"
               class="px-4 py-2.5 bg-gradient-to-r from-success-600 to-success-700 hover:from-success-700 hover:to-success-800 text-white rounded-lg transition-all text-sm flex items-center gap-1.5"
               @click="openActionModal('resolve', currentAlert!)"
             >

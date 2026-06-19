@@ -31,6 +31,7 @@ import {
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
 import { useSavedFilters } from '@/composables/useSavedFilters'
+import { usePermission } from '@/composables/usePermission'
 import type { SavedFilter } from '@/composables/useSavedFilters'
 import { exportToCsv } from '@/utils/csv'
 import {
@@ -61,6 +62,7 @@ import { formatDate, getExpiryDays } from '@/utils/date'
 import BatchOperationDialog from '@/components/BatchOperationDialog.vue'
 
 const route = useRoute()
+const permission = usePermission()
 const loading = ref(false)
 const data = ref<PageResult<ReagentBatch> | null>(null)
 const reagents = ref<Reagent[]>([])
@@ -451,8 +453,8 @@ onMounted(() => {
       v-model="filters"
       :filter-fields="dynamicFilterFields"
       :saved-filters="savedFilters"
-      :show-export="true"
-      action-button-text="录入批次"
+      :show-export="permission.canCreateBatch"
+      :action-button-text="permission.canCreateBatch ? '录入批次' : undefined"
       keyword-placeholder="搜索批次号、试剂名称、CAS号、厂家、货号、库位..."
       @search="handleSearch"
       @reset="handleReset"
@@ -608,14 +610,17 @@ onMounted(() => {
                       <Eye class="w-4 h-4" />
                     </button>
                     <button
-                      v-if="batch.status !== 'expired' && batch.status !== 'exhausted' && batch.status !== 'frozen'"
+                      v-if="permission.canOutboundBatch && batch.status !== 'expired' && batch.status !== 'exhausted' && batch.status !== 'frozen'"
                       class="p-1.5 text-success-600 hover:bg-success-50 rounded transition-colors"
                       title="出库"
                       @click="openOutboundModal(batch.id)"
                     >
                       <ArrowDownCircle class="w-4 h-4" />
                     </button>
-                    <div class="relative">
+                    <div
+                      v-if="permission.canOperateBatch"
+                      class="relative"
+                    >
                       <button
                         class="p-1.5 text-gray-600 hover:bg-gray-100 rounded transition-colors"
                         title="更多操作"
@@ -1064,6 +1069,7 @@ onMounted(() => {
                 <div class="flex items-center gap-2">
                   <button
                     v-if="
+                      permission.canOutboundBatch &&
                       currentBatch.status !== 'expired' &&
                       currentBatch.status !== 'exhausted' &&
                       currentBatch.status !== 'frozen'
@@ -1074,7 +1080,10 @@ onMounted(() => {
                     <ArrowDownCircle class="w-4 h-4" />
                     出库
                   </button>
-                  <div class="relative">
+                  <div
+                    v-if="permission.canOperateBatch"
+                    class="relative"
+                  >
                     <button
                       class="px-3 py-1.5 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors flex items-center gap-1"
                       @click="toggleMoreMenu(currentBatch.id, $event)"

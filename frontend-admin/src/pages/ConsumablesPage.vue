@@ -52,8 +52,10 @@ import {
 import type { PageResult } from '@/types/common'
 import { formatDate } from '@/utils/date'
 import ConsumableOperationModal from '@/components/ConsumableOperationModal.vue'
+import { usePermission } from '@/composables/usePermission'
 
 const router = useRouter()
+const permission = usePermission()
 
 const activeTab = ref<'list' | 'operations'>('list')
 
@@ -425,9 +427,9 @@ onMounted(() => {
           v-model="filters"
           :filter-fields="filterFields"
           :saved-filters="savedFilters"
-          :show-export="true"
+          :show-export="permission.canCreateConsumable"
           :plain="true"
-          action-button-text="新增耗材"
+          :action-button-text="permission.canCreateConsumable ? '新增耗材' : undefined"
           keyword-placeholder="搜索耗材名称、厂家、货号、库位..."
           class="mb-6"
           @search="handleSearch"
@@ -565,7 +567,7 @@ onMounted(() => {
                         <Eye class="w-4 h-4" />
                       </button>
 
-                      <div class="relative group">
+                      <div v-if="permission.canOperateConsumable || permission.canUseConsumable" class="relative group">
                         <button
                           class="p-1.5 text-primary-500 hover:bg-primary-50 rounded transition-colors"
                           title="库存操作"
@@ -573,29 +575,31 @@ onMounted(() => {
                           <MoreHorizontal class="w-4 h-4" />
                         </button>
                         <div class="absolute right-0 top-full mt-1 w-36 bg-white rounded-lg shadow-xl border border-gray-100 py-1 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10">
-                          <button
-                            v-for="config in operationTypeConfigs"
-                            :key="config.type"
-                            class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                            @click="openOperationModal(item, config.type)"
-                          >
-                            <component
-                              :is="{
-                                stock_in: PackagePlus,
-                                use: UserCheck,
-                                return: RotateCcw,
-                                scrap: ScrapIcon,
-                                transfer: ArrowLeftRight,
-                                adjust: Wrench,
-                              }[config.type]"
-                              class="w-3.5 h-3.5"
-                            />
-                            {{ config.label }}
-                          </button>
+                          <template v-for="config in operationTypeConfigs" :key="config.type">
+                            <button
+                              v-if="(config.type === 'use' && permission.canUseConsumable) || (config.type !== 'use' && permission.canOperateConsumable)"
+                              class="w-full px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                              @click="openOperationModal(item, config.type)"
+                            >
+                              <component
+                                :is="{
+                                  stock_in: PackagePlus,
+                                  use: UserCheck,
+                                  return: RotateCcw,
+                                  scrap: ScrapIcon,
+                                  transfer: ArrowLeftRight,
+                                  adjust: Wrench,
+                                }[config.type]"
+                                class="w-3.5 h-3.5"
+                              />
+                              {{ config.label }}
+                            </button>
+                          </template>
                         </div>
                       </div>
 
                       <button
+                        v-if="permission.canEditConsumable"
                         class="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                         title="编辑"
                         @click="openEditModal(item.id)"
@@ -603,6 +607,7 @@ onMounted(() => {
                         <Edit2 class="w-4 h-4" />
                       </button>
                       <button
+                        v-if="permission.canDeleteConsumable"
                         class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                         title="删除"
                         @click="handleDelete(item.id)"

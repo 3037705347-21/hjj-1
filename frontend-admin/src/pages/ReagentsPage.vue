@@ -45,9 +45,11 @@ import {
   commonBrands,
 } from '@/types/reagent'
 import { formatDate } from '@/utils/date'
+import { usePermission } from '@/composables/usePermission'
 
 const router = useRouter()
 const loading = ref(false)
+const permission = usePermission()
 const data = ref<PageResult<Reagent> | null>(null)
 
 const filters = ref<Record<string, any>>({
@@ -390,8 +392,8 @@ onMounted(() => {
       v-model="filters"
       :filter-fields="filterFields"
       :saved-filters="savedFilters"
-      :show-export="true"
-      action-button-text="新增试剂"
+      :show-export="permission.canCreateReagent"
+      :action-button-text="permission.canCreateReagent ? '新增试剂' : undefined"
       keyword-placeholder="搜索试剂名称、CAS号、批次号、厂家、货号、库位..."
       @search="handleSearch"
       @reset="handleReset"
@@ -481,6 +483,7 @@ onMounted(() => {
                       <FileText class="w-4 h-4" />
                     </button>
                     <button
+                      v-if="permission.canViewBatches"
                       class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors"
                       title="查看批次"
                       @click="goToBatches(reagent.id)"
@@ -488,6 +491,7 @@ onMounted(() => {
                       <Package class="w-4 h-4" />
                     </button>
                     <button
+                      v-if="permission.canEditReagent"
                       class="p-1.5 text-gray-500 hover:bg-gray-100 rounded transition-colors"
                       title="编辑"
                       @click="openEditModal(reagent.id)"
@@ -495,6 +499,7 @@ onMounted(() => {
                       <Edit2 class="w-4 h-4" />
                     </button>
                     <button
+                      v-if="permission.canDeleteReagent"
                       class="p-1.5 text-red-500 hover:bg-red-50 rounded transition-colors"
                       title="删除"
                       @click="handleDelete(reagent.id)"
@@ -951,7 +956,7 @@ onMounted(() => {
           </div>
           <div class="flex items-center gap-2">
             <button
-              v-if="detailData"
+              v-if="detailData && permission.canEditReagent"
               class="px-4 py-2 text-primary-600 hover:bg-primary-50 rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
               @click="openEditModal(detailData.id); showDetailModal = false"
             >
