@@ -8,6 +8,7 @@ import BatchesPage from '@/pages/BatchesPage.vue'
 import ConsumablesPage from '@/pages/ConsumablesPage.vue'
 import ConsumableDetailPage from '@/pages/ConsumableDetailPage.vue'
 import AlertsPage from '@/pages/AlertsPage.vue'
+import AuditLogsPage from '@/pages/AuditLogsPage.vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
 
@@ -66,6 +67,12 @@ const routes: RouteRecordRaw[] = [
         name: 'alerts',
         component: AlertsPage,
         meta: { title: '预警规则中心', permissions: ['alert:view'] },
+      },
+      {
+        path: 'audit-logs',
+        name: 'audit-logs',
+        component: AuditLogsPage,
+        meta: { title: '审计日志', permissions: ['audit:view'] },
       },
     ],
   },

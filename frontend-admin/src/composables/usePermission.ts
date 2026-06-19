@@ -70,6 +70,9 @@ export function usePermission() {
   const canConfigSystem = computed(() => hasPermission('system:config'))
   const canManageSystem = computed(() => hasAnyPermission(['user:manage', 'role:manage', 'system:config']))
 
+  const canViewAuditLogs = computed(() => hasPermission('audit:view'))
+  const canExportAuditLogs = computed(() => hasPermission('audit:export'))
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -110,5 +113,7 @@ export function usePermission() {
     canManageRoles,
     canConfigSystem,
     canManageSystem,
+    canViewAuditLogs,
+    canExportAuditLogs,
   }
 }

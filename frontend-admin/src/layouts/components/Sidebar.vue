@@ -13,6 +13,7 @@ import {
   Users,
   Shield,
   Settings,
+  FileText,
 } from 'lucide-vue-next'
 import { getUserStore } from '@/stores/user'
 import { roleLabels } from '@/types/user'
@@ -45,6 +46,7 @@ const allMenuItems: MenuItem[] = [
   { path: '/batches', name: '试剂批管理', icon: TestTube, permission: 'batch:view' },
   { path: '/consumables', name: '耗材管理', icon: PackageOpen, permission: 'consumable:view' },
   { path: '/alerts', name: '预警中心', icon: AlertTriangle, permission: 'alert:view' },
+  { path: '/audit-logs', name: '审计日志', icon: FileText, permission: 'audit:view' },
   { path: '/users', name: '用户管理', icon: Users, permission: 'user:manage' },
   { path: '/roles', name: '角色管理', icon: Shield, permission: 'role:manage' },
   { path: '/settings', name: '系统配置', icon: Settings, permission: 'system:config' },

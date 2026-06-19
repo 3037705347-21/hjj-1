@@ -10,6 +10,8 @@ import type { PageResult } from '@/types/common'
 import { generateId } from '@/utils/date'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
+import { addAuditLog } from './audit'
+import type { AuditOperationType } from '@/types/audit'
 
 const STORAGE_KEY = 'mock_consumables'
 const OPERATION_STORAGE_KEY = 'mock_consumable_operations'
@@ -573,6 +575,8 @@ export function mockCreateConsumable(data: ConsumableFormData): Promise<Consumab
         saveOperationsToStorage(operations)
       }
 
+      addAuditLog({ module: 'consumable', operationType: 'create', targetType: 'consumable', targetId: newConsumable.id, targetName: newConsumable.name, afterContent: `分类: ${newConsumable.category}, 规格: ${newConsumable.specification}, 库存: ${newConsumable.stockQuantity} ${newConsumable.unit}`, remark: '新增耗材' })
+
       resolve(newConsumable)
     }, 300)
   })
@@ -596,6 +600,7 @@ export function mockUpdateConsumable(
         updatedAt: new Date().toISOString(),
       }
       saveConsumablesToStorage(consumables)
+      addAuditLog({ module: 'consumable', operationType: 'update', targetType: 'consumable', targetId: id, targetName: consumables[index].name, afterContent: `分类: ${consumables[index].category}, 规格: ${consumables[index].specification}, 库存: ${consumables[index].stockQuantity} ${consumables[index].unit}`, remark: '编辑耗材' })
       resolve(consumables[index])
     }, 300)
   })
@@ -611,6 +616,8 @@ export function mockDeleteConsumable(id: string): Promise<void> {
       const operations = getOperationsFromStorage()
       const filteredOps = operations.filter((op) => op.consumableId !== id)
       saveOperationsToStorage(filteredOps)
+
+      addAuditLog({ module: 'consumable', operationType: 'delete', targetType: 'consumable', targetId: id, targetName: '耗材', remark: '删除耗材' })
 
       resolve()
     }, 200)
@@ -732,6 +739,8 @@ export function mockConsumableOperation(
       operations.unshift(operation)
       saveOperationsToStorage(operations)
 
+      addAuditLog({ module: 'consumable', operationType: (data.type === 'receive' ? 'stock_in' : data.type) as AuditOperationType, targetType: 'consumable', targetId: id, targetName: consumable.name, beforeContent: `库存: ${beforeQuantity} ${consumable.unit}`, afterContent: `库存: ${afterQuantity} ${consumable.unit}`, remark: purpose || reason || '' })
+
       resolve(operation)
     }, 300)
   })
@@ -815,6 +824,8 @@ export function mockBatchDeleteConsumables(ids: string[]): Promise<void> {
       const filteredOps = operations.filter(o => !ids.includes(o.consumableId))
       saveOperationsToStorage(filteredOps)
 
+      addAuditLog({ module: 'consumable', operationType: 'batch_delete', targetType: 'consumable', targetId: ids.join(','), targetName: `批量删除${ids.length}条耗材`, remark: '批量删除耗材' })
+
       resolve()
     }, 300)
   })
@@ -832,6 +843,7 @@ export function mockBatchUpdateConsumableCategory(ids: string[], category: strin
         return c
       })
       saveConsumablesToStorage(updated)
+      addAuditLog({ module: 'consumable', operationType: 'batch_update', targetType: 'consumable', targetId: ids.join(','), targetName: `批量更新分类`, afterContent: `分类: ${category}`, remark: `批量更新${ids.length}条耗材分类` })
       resolve()
     }, 300)
   })
@@ -870,6 +882,7 @@ export function mockBatchUpdateConsumableLocation(ids: string[], location: strin
 
       saveConsumablesToStorage(updatedConsumables)
       saveOperationsToStorage(operations)
+      addAuditLog({ module: 'consumable', operationType: 'transfer', targetType: 'consumable', targetId: ids.join(','), targetName: `批量调拨库位`, afterContent: `目标库位: ${location}`, remark: `批量调拨${ids.length}条耗材库位` })
       resolve()
     }, 300)
   })

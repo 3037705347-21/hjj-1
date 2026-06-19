@@ -1,6 +1,7 @@
 import type { Reagent, ReagentFormData } from '@/types/reagent'
 import type { PageResult } from '@/types/common'
 import { generateId } from '@/utils/date'
+import { addAuditLog } from './audit'
 
 const STORAGE_KEY = 'mock_reagents'
 
@@ -446,6 +447,7 @@ export function mockCreateReagent(data: ReagentFormData): Promise<Reagent> {
       }
       reagents.unshift(newReagent)
       saveReagentsToStorage(reagents)
+      addAuditLog({ module: 'reagent', operationType: 'create', targetType: 'reagent', targetId: newReagent.id, targetName: newReagent.name, afterContent: `分类: ${newReagent.category}, 规格: ${newReagent.specification}, 储存条件: ${newReagent.storageCondition}`, remark: '新增试剂' })
       resolve(newReagent)
     }, 300)
   })
@@ -466,6 +468,7 @@ export function mockUpdateReagent(id: string, data: ReagentFormData): Promise<Re
         updatedAt: new Date().toISOString(),
       }
       saveReagentsToStorage(reagents)
+      addAuditLog({ module: 'reagent', operationType: 'update', targetType: 'reagent', targetId: id, targetName: reagents[index].name, beforeContent: `更新前数据`, afterContent: `分类: ${reagents[index].category}, 规格: ${reagents[index].specification}`, remark: '编辑试剂' })
       resolve(reagents[index])
     }, 300)
   })
@@ -477,6 +480,7 @@ export function mockDeleteReagent(id: string): Promise<void> {
       const reagents = getReagentsFromStorage()
       const filtered = reagents.filter(r => r.id !== id)
       saveReagentsToStorage(filtered)
+      addAuditLog({ module: 'reagent', operationType: 'delete', targetType: 'reagent', targetId: id, targetName: '试剂', remark: '删除试剂' })
       resolve()
     }, 200)
   })
@@ -496,6 +500,7 @@ export function mockBatchDeleteReagents(ids: string[]): Promise<void> {
       const reagents = getReagentsFromStorage()
       const filtered = reagents.filter(r => !ids.includes(r.id))
       saveReagentsToStorage(filtered)
+      addAuditLog({ module: 'reagent', operationType: 'batch_delete', targetType: 'reagent', targetId: ids.join(','), targetName: `批量删除${ids.length}条试剂`, remark: '批量删除试剂' })
       resolve()
     }, 300)
   })
@@ -513,6 +518,7 @@ export function mockBatchUpdateReagentCategory(ids: string[], category: string):
         return r
       })
       saveReagentsToStorage(updated)
+      addAuditLog({ module: 'reagent', operationType: 'batch_update', targetType: 'reagent', targetId: ids.join(','), targetName: `批量更新分类`, afterContent: `分类: ${category}`, remark: `批量更新${ids.length}条试剂分类` })
       resolve()
     }, 300)
   })
@@ -530,6 +536,7 @@ export function mockBatchUpdateReagentStorageCondition(ids: string[], storageCon
         return r
       })
       saveReagentsToStorage(updated)
+      addAuditLog({ module: 'reagent', operationType: 'batch_update', targetType: 'reagent', targetId: ids.join(','), targetName: `批量更新储存条件`, afterContent: `储存条件: ${storageCondition}`, remark: `批量更新${ids.length}条试剂储存条件` })
       resolve()
     }, 300)
   })
@@ -547,6 +554,7 @@ export function mockBatchUpdateReagentStatus(ids: string[], enabled: boolean): P
         return r
       })
       saveReagentsToStorage(updated)
+      addAuditLog({ module: 'reagent', operationType: 'batch_update', targetType: 'reagent', targetId: ids.join(','), targetName: `批量更新状态`, afterContent: `状态: ${enabled ? '启用' : '停用'}`, remark: `批量更新${ids.length}条试剂状态` })
       resolve()
     }, 300)
   })
@@ -690,6 +698,7 @@ export async function mockBatchImportReagents(file: File): Promise<ImportResult>
         })
 
         saveReagentsToStorage(reagents)
+        addAuditLog({ module: 'reagent', operationType: 'import', targetType: 'reagent', targetId: '', targetName: '批量导入试剂', afterContent: `总计: ${result.total}, 成功: ${result.success}, 失败: ${result.failed}`, remark: 'CSV导入试剂' })
         resolve(result)
       } catch (err: any) {
         reject(new Error('文件解析失败：' + err.message))

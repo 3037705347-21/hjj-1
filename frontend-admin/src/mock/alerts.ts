@@ -14,6 +14,7 @@ import type { User } from '@/types/user'
 import { defaultAlertRules, alertTypeLabels, availableHandlers } from '@/types/alert'
 import { getBatchesFromStorage } from './batches'
 import { getConsumablesFromStorage } from './consumables'
+import { addAuditLog } from './audit'
 
 const RULES_STORAGE_KEY = 'mock_alert_rules'
 const RECORDS_STORAGE_KEY = 'mock_alert_records'
@@ -279,6 +280,7 @@ export function mockUpdateAlertRule(id: string, data: Partial<AlertRule>): Promi
         updatedAt: new Date().toISOString(),
       }
       saveRulesToStorage(rules)
+      addAuditLog({ module: 'alert', operationType: 'update_rule', targetType: 'alert_rule', targetId: id, targetName: rules[index].name, remark: '更新预警规则' })
       resolve(rules[index])
     }, 200)
   })
@@ -299,6 +301,7 @@ export function mockToggleAlertRule(id: string): Promise<AlertRule> {
         updatedAt: new Date().toISOString(),
       }
       saveRulesToStorage(rules)
+      addAuditLog({ module: 'alert', operationType: 'toggle_rule', targetType: 'alert_rule', targetId: id, targetName: rules[index].name, beforeContent: `状态: ${!rules[index].enabled ? '停用' : '启用'}`, afterContent: `状态: ${rules[index].enabled ? '启用' : '停用'}`, remark: rules[index].enabled ? '启用预警规则' : '停用预警规则' })
       resolve(rules[index])
     }, 200)
   })
@@ -421,6 +424,8 @@ export function mockMarkAlertRead(id: string): Promise<AlertRecord> {
       })
       saveHandleRecordsToStorage(handleRecords)
 
+      addAuditLog({ module: 'alert', operationType: 'read', targetType: 'alert', targetId: id, targetName: records[index].title, beforeContent: '状态: 未读', afterContent: '状态: 已读', remark: '标记已读' })
+
       resolve(records[index])
     }, 200)
   })
@@ -455,6 +460,8 @@ export function mockIgnoreAlert(id: string, remark?: string): Promise<AlertRecor
         createdAt: now,
       })
       saveHandleRecordsToStorage(handleRecords)
+
+      addAuditLog({ module: 'alert', operationType: 'ignore', targetType: 'alert', targetId: id, targetName: records[index].title, beforeContent: `状态: ${records[index].status === 'unread' ? '未读' : records[index].status}`, afterContent: '状态: 已忽略', remark: remark || '忽略预警' })
 
       resolve(records[index])
     }, 200)
@@ -496,6 +503,8 @@ export function mockAssignAlert(id: string, assignee: string, assigneeName: stri
       })
       saveHandleRecordsToStorage(handleRecords)
 
+      addAuditLog({ module: 'alert', operationType: 'assign', targetType: 'alert', targetId: id, targetName: records[index].title, beforeContent: `处理人: ${fromAssigneeName || '无'}`, afterContent: `处理人: ${assigneeName}`, remark: '转派预警' })
+
       resolve(records[index])
     }, 200)
   })
@@ -531,6 +540,8 @@ export function mockResolveAlert(id: string, result: string): Promise<AlertRecor
         createdAt: now,
       })
       saveHandleRecordsToStorage(handleRecords)
+
+      addAuditLog({ module: 'alert', operationType: 'resolve', targetType: 'alert', targetId: id, targetName: records[index].title, beforeContent: '状态: 处理中', afterContent: '状态: 已解决', remark: result })
 
       resolve(records[index])
     }, 200)

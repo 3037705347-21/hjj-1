@@ -26,6 +26,8 @@ export type PermissionCode =
   | 'alert:assign'
   | 'alert:rule:edit'
   | 'alert:rule:manage'
+  | 'audit:view'
+  | 'audit:export'
 
 export type DataScope = 'all' | 'lab' | 'department' | 'group' | 'self'
 
@@ -61,6 +63,8 @@ export const permissionLabels: Record<PermissionCode, string> = {
   'alert:assign': '转派预警',
   'alert:rule:edit': '编辑预警规则',
   'alert:rule:manage': '管理预警规则',
+  'audit:view': '查看审计日志',
+  'audit:export': '导出审计日志',
 }
 
 export const dataScopeLabels: Record<DataScope, string> = {
@@ -98,6 +102,8 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'alert:assign',
     'alert:rule:edit',
     'alert:rule:manage',
+    'audit:view',
+    'audit:export',
   ],
   lab_manager: [
     'dashboard:view',
@@ -121,6 +127,7 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'alert:handle',
     'alert:assign',
     'alert:rule:edit',
+    'audit:view',
   ],
   lab_staff: [
     'dashboard:view',

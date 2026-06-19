@@ -11,6 +11,7 @@ import { generateId, getExpiryDays, isExpired, isExpiringSoon } from '@/utils/da
 import { mockGetAllReagents } from './reagents'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
+import { addAuditLog } from './audit'
 
 const BATCH_STORAGE_KEY = 'mock_batches'
 const OPERATION_STORAGE_KEY = 'mock_batch_operations'
@@ -521,6 +522,8 @@ export function mockCreateBatch(data: BatchFormData): Promise<ReagentBatch> {
       })
       saveOperationsToStorage(operations)
 
+      addAuditLog({ module: 'batch', operationType: 'inbound', targetType: 'batch', targetId: newBatch.id, targetName: newBatch.batchNumber, beforeContent: `库存: 0 ${newBatch.unit || ''}`, afterContent: `库存: ${newBatch.initialQuantity} ${newBatch.unit || ''}`, remark: '新批次入库' })
+
       resolve(newBatch)
     }, 400)
   })
@@ -582,6 +585,8 @@ export function mockBatchOutbound(
       const operations = getOperationsFromStorage()
       operations.unshift(operation)
       saveOperationsToStorage(operations)
+
+      addAuditLog({ module: 'batch', operationType: 'outbound', targetType: 'batch', targetId: id, targetName: batches[index].batchNumber, beforeContent: `库存: ${beforeQuantity} ${batch.unit || ''}`, afterContent: `库存: ${batch.remainingQuantity} ${batch.unit || ''}`, remark: data.purpose })
 
       resolve(operation)
     }, 300)
@@ -726,6 +731,8 @@ export function mockBatchOperation(
       operations.unshift(operation)
       saveOperationsToStorage(operations)
 
+      addAuditLog({ module: 'batch', operationType: data.type, targetType: 'batch', targetId: id, targetName: batches[index].batchNumber, beforeContent: `库存: ${beforeQuantity} ${batches[index].unit || ''}`, afterContent: `库存: ${afterQuantity} ${batches[index].unit || ''}`, remark: data.reason || '' })
+
       resolve(operation)
     }, 300)
   })
@@ -790,6 +797,8 @@ export function mockBatchDeleteBatches(ids: string[]): Promise<void> {
       const filteredOps = operations.filter(o => !ids.includes(o.batchId))
       saveOperationsToStorage(filteredOps)
 
+      addAuditLog({ module: 'batch', operationType: 'batch_delete', targetType: 'batch', targetId: ids.join(','), targetName: `批量删除${ids.length}个批次`, remark: '批量删除批次' })
+
       resolve()
     }, 300)
   })
@@ -826,6 +835,9 @@ export function mockBatchUpdateBatchLocation(ids: string[], storageLocation: str
 
       saveBatchesToStorage(updatedBatches)
       saveOperationsToStorage(operations)
+
+      addAuditLog({ module: 'batch', operationType: 'transfer', targetType: 'batch', targetId: ids.join(','), targetName: `批量调拨库位`, afterContent: `目标库位: ${storageLocation}`, remark: `批量调拨${ids.length}个批次库位` })
+
       resolve()
     }, 300)
   })
@@ -886,6 +898,9 @@ export function mockBatchUpdateBatchStatus(ids: string[], status: 'freeze' | 'un
 
         saveBatchesToStorage(updatedBatches)
         saveOperationsToStorage(operations)
+
+        addAuditLog({ module: 'batch', operationType: status === 'freeze' ? 'freeze' : 'unfreeze', targetType: 'batch', targetId: ids.join(','), targetName: status === 'freeze' ? '批量冻结' : '批量解冻', afterContent: `操作: ${status === 'freeze' ? '冻结' : '解冻'}`, remark: `批量${status === 'freeze' ? '冻结' : '解冻'}${ids.length}个批次` })
+
         resolve()
       } catch (e: any) {
         reject(e)
