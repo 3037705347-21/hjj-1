@@ -4,6 +4,16 @@ import { generateId } from '@/utils/date'
 
 const STORAGE_KEY = 'mock_reagents'
 
+export interface ReagentFilterParams {
+  keyword?: string
+  category?: string
+  brand?: string
+  catalogNumber?: string
+  hazardLevel?: string
+  storageCondition?: string
+  enabled?: string
+}
+
 function getReagentsFromStorage(): Reagent[] {
   const data = localStorage.getItem(STORAGE_KEY)
   if (data) {
@@ -31,9 +41,22 @@ function initMockReagents(): Reagent[] {
       specification: '100mg/mL',
       unit: 'mL',
       manufacturer: 'Sigma-Aldrich',
+      brand: 'Sigma-Aldrich',
+      catalogNumber: 'A7906-100ML',
+      purity: '≥98%',
+      concentration: '100mg/mL',
+      packagingSpec: '100mL/瓶',
+      experimentTypes: ['Western Blot', 'ELISA', '免疫组化'],
+      aliases: 'BSA; Bovine Serum Albumin',
+      openedValidity: '30天',
+      incompatibilities: '避免与强氧化剂接触',
+      sdsAttachment: { name: 'A7906_SDS.pdf', url: '/files/A7906_SDS.pdf', size: 245000, uploadedAt: now },
+      qcReportAttachment: { name: 'QC_A7906_20250601.pdf', url: '/files/QC_A7906.pdf', size: 128000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '2-8°C',
       hazardLevel: 'low',
-      description: '用于Western Blot封闭液配制',
+      description: '用于Western Blot封闭液配制、蛋白标准品制备等',
       createdAt: now,
       updatedAt: now,
     },
@@ -45,9 +68,21 @@ function initMockReagents(): Reagent[] {
       specification: '5U/μL',
       unit: 'μL',
       manufacturer: 'Thermo Fisher',
+      brand: 'Thermo Fisher',
+      catalogNumber: '10342-020',
+      purity: '≥95%',
+      concentration: '5U/μL',
+      packagingSpec: '500μL/管',
+      experimentTypes: ['PCR扩增', '荧光定量PCR'],
+      aliases: 'Taq Polymerase; Taq酶',
+      openedValidity: '60天',
+      incompatibilities: '避免反复冻融，避免与核酸酶污染',
+      sdsAttachment: { name: '10342020_SDS.pdf', url: '/files/10342020_SDS.pdf', size: 312000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '-20°C',
       hazardLevel: 'low',
-      description: '常规PCR扩增用',
+      description: '常规PCR扩增用，具有5\'→3\'聚合酶活性',
       createdAt: now,
       updatedAt: now,
     },
@@ -59,9 +94,22 @@ function initMockReagents(): Reagent[] {
       specification: '500mL',
       unit: 'mL',
       manufacturer: 'Invitrogen',
+      brand: 'Invitrogen',
+      catalogNumber: 'AM9855',
+      purity: '分子生物学级',
+      concentration: '1M',
+      packagingSpec: '500mL/瓶',
+      experimentTypes: ['PCR扩增', '核酸电泳', 'Western Blot'],
+      aliases: 'Tris-HCl Buffer',
+      openedValidity: '180天',
+      incompatibilities: '避免与强酸强碱混合',
+      sdsAttachment: { name: 'AM9855_SDS.pdf', url: '/files/AM9855_SDS.pdf', size: 198000, uploadedAt: now },
+      qcReportAttachment: { name: 'QC_AM9855.pdf', url: '/files/QC_AM9855.pdf', size: 88000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'low',
-      description: '分子生物学实验常用缓冲液',
+      description: '分子生物学实验常用缓冲液，pH 8.0 ± 0.1',
       createdAt: now,
       updatedAt: now,
     },
@@ -73,9 +121,22 @@ function initMockReagents(): Reagent[] {
       specification: 'HPLC级 4L',
       unit: 'L',
       manufacturer: 'Merck',
+      brand: 'Merck',
+      catalogNumber: '1.00030.4008',
+      purity: '≥99.9%',
+      concentration: '',
+      packagingSpec: '4L/瓶',
+      experimentTypes: ['液相色谱'],
+      aliases: 'Acetonitrile; ACN; 氰基甲烷',
+      openedValidity: '365天',
+      incompatibilities: '易燃，远离火源。避免与氧化剂、还原剂、酸类接触',
+      sdsAttachment: { name: '1000304008_SDS.pdf', url: '/files/1000304008_SDS.pdf', size: 425000, uploadedAt: now },
+      qcReportAttachment: { name: 'QC_1000304008.pdf', url: '/files/QC_1000304008.pdf', size: 156000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'high',
-      description: '液相色谱流动相',
+      description: '液相色谱流动相，HPLC梯度级',
       createdAt: now,
       updatedAt: now,
     },
@@ -87,9 +148,21 @@ function initMockReagents(): Reagent[] {
       specification: '10× 1L',
       unit: 'L',
       manufacturer: 'HyClone',
+      brand: 'HyClone',
+      catalogNumber: 'SH30258.01',
+      purity: '细胞培养级',
+      concentration: '10×',
+      packagingSpec: '1L/瓶',
+      experimentTypes: ['细胞培养', 'ELISA', '免疫组化'],
+      aliases: 'Phosphate Buffered Saline; 磷酸盐缓冲盐水',
+      openedValidity: '30天',
+      incompatibilities: '',
+      sdsAttachment: { name: 'SH30258_SDS.pdf', url: '/files/SH30258_SDS.pdf', size: 168000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'low',
-      description: '细胞培养和免疫实验用',
+      description: '细胞培养和免疫实验用，pH 7.2 ± 0.2',
       createdAt: now,
       updatedAt: now,
     },
@@ -101,9 +174,22 @@ function initMockReagents(): Reagent[] {
       specification: '100g',
       unit: 'g',
       manufacturer: 'Biowest',
+      brand: 'Biowest',
+      catalogNumber: '111860',
+      purity: '电泳级',
+      concentration: '',
+      packagingSpec: '100g/瓶',
+      experimentTypes: ['核酸电泳'],
+      aliases: 'Agarose',
+      openedValidity: '730天',
+      incompatibilities: '避免潮湿，避免与强酸接触',
+      sdsAttachment: { name: '111860_SDS.pdf', url: '/files/111860_SDS.pdf', size: 210000, uploadedAt: now },
+      qcReportAttachment: { name: 'QC_111860.pdf', url: '/files/QC_111860.pdf', size: 92000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'low',
-      description: '核酸电泳用琼脂糖',
+      description: '核酸电泳用琼脂糖，凝胶强度均匀',
       createdAt: now,
       updatedAt: now,
     },
@@ -115,9 +201,21 @@ function initMockReagents(): Reagent[] {
       specification: '100mL',
       unit: 'mL',
       manufacturer: 'Sigma-Aldrich',
+      brand: 'Sigma-Aldrich',
+      catalogNumber: 'D2650-100ML',
+      purity: '≥99.9%',
+      concentration: '',
+      packagingSpec: '100mL/瓶',
+      experimentTypes: ['细胞培养'],
+      aliases: 'DMSO; Dimethyl sulfoxide; 二甲亚砜',
+      openedValidity: '365天',
+      incompatibilities: '避免与强氧化剂、酸性氯化物接触',
+      sdsAttachment: { name: 'D2650_SDS.pdf', url: '/files/D2650_SDS.pdf', size: 380000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'medium',
-      description: '细胞冻存和试剂溶解用',
+      description: '细胞冻存和试剂溶解用，细胞培养级',
       createdAt: now,
       updatedAt: now,
     },
@@ -129,9 +227,22 @@ function initMockReagents(): Reagent[] {
       specification: '500g',
       unit: 'g',
       manufacturer: 'BD Biosciences',
+      brand: 'BD Biosciences',
+      catalogNumber: '244620',
+      purity: '微生物级',
+      concentration: '',
+      packagingSpec: '500g/瓶',
+      experimentTypes: ['细胞培养'],
+      aliases: 'Luria-Bertani Medium; LB Broth',
+      openedValidity: '365天',
+      incompatibilities: '避免潮湿环境',
+      sdsAttachment: { name: '244620_SDS.pdf', url: '/files/244620_SDS.pdf', size: 175000, uploadedAt: now },
+      qcReportAttachment: { name: 'QC_244620.pdf', url: '/files/QC_244620.pdf', size: 110000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'low',
-      description: '大肠杆菌培养用',
+      description: '大肠杆菌培养用，粉末培养基',
       createdAt: now,
       updatedAt: now,
     },
@@ -143,9 +254,21 @@ function initMockReagents(): Reagent[] {
       specification: '10g',
       unit: 'g',
       manufacturer: 'Sigma-Aldrich',
+      brand: 'Sigma-Aldrich',
+      catalogNumber: 'B7920-10G',
+      purity: '≥70%',
+      concentration: '',
+      packagingSpec: '10g/瓶',
+      experimentTypes: ['蛋白质电泳', 'Western Blot'],
+      aliases: 'Coomassie Brilliant Blue R-250; CBB R-250',
+      openedValidity: '730天',
+      incompatibilities: '避免与强氧化剂接触',
+      sdsAttachment: { name: 'B7920_SDS.pdf', url: '/files/B7920_SDS.pdf', size: 225000, uploadedAt: now },
+      reagentImage: '',
+      enabled: true,
       storageCondition: '常温',
       hazardLevel: 'medium',
-      description: '蛋白质电泳染色',
+      description: '蛋白质电泳染色，灵敏度高',
       createdAt: now,
       updatedAt: now,
     },
@@ -157,9 +280,22 @@ function initMockReagents(): Reagent[] {
       specification: 'AR 500g',
       unit: 'g',
       manufacturer: '国药集团',
+      brand: '国药集团',
+      catalogNumber: '10019318',
+      purity: '≥99.5%（AR级）',
+      concentration: '',
+      packagingSpec: '500g/瓶',
+      experimentTypes: ['其他'],
+      aliases: 'Sodium Chloride; 食盐',
+      openedValidity: '1095天',
+      incompatibilities: '避免与银盐接触',
+      sdsAttachment: { name: '10019318_SDS.pdf', url: '/files/10019318_SDS.pdf', size: 142000, uploadedAt: now },
+      qcReportAttachment: { name: 'QC_10019318.pdf', url: '/files/QC_10019318.pdf', size: 78000, uploadedAt: now },
+      reagentImage: '',
+      enabled: false,
       storageCondition: '常温',
       hazardLevel: 'low',
-      description: '分析纯氯化钠',
+      description: '分析纯氯化钠，用于缓冲液配制',
       createdAt: now,
       updatedAt: now,
     },
@@ -171,24 +307,49 @@ function initMockReagents(): Reagent[] {
 export function mockGetReagents(
   page: number = 1,
   pageSize: number = 10,
-  keyword?: string,
-  category?: string
+  filters?: ReagentFilterParams
 ): Promise<PageResult<Reagent>> {
   return new Promise((resolve) => {
     setTimeout(() => {
       let reagents = getReagentsFromStorage()
       
-      if (keyword) {
-        const kw = keyword.toLowerCase()
-        reagents = reagents.filter(
-          r => r.name.toLowerCase().includes(kw) || 
-               r.casNumber?.toLowerCase().includes(kw) ||
-               r.manufacturer?.toLowerCase().includes(kw)
-        )
-      }
-      
-      if (category) {
-        reagents = reagents.filter(r => r.category === category)
+      if (filters) {
+        const { keyword, category, brand, catalogNumber, hazardLevel, storageCondition, enabled } = filters
+        
+        if (keyword) {
+          const kw = keyword.toLowerCase()
+          reagents = reagents.filter(
+            r => r.name.toLowerCase().includes(kw) || 
+                 r.casNumber?.toLowerCase().includes(kw) ||
+                 r.manufacturer?.toLowerCase().includes(kw)
+          )
+        }
+        
+        if (category) {
+          reagents = reagents.filter(r => r.category === category)
+        }
+        
+        if (brand) {
+          reagents = reagents.filter(r => r.brand === brand)
+        }
+        
+        if (catalogNumber) {
+          const cn = catalogNumber.toLowerCase()
+          reagents = reagents.filter(r => r.catalogNumber?.toLowerCase().includes(cn))
+        }
+        
+        if (hazardLevel) {
+          reagents = reagents.filter(r => r.hazardLevel === hazardLevel)
+        }
+        
+        if (storageCondition) {
+          reagents = reagents.filter(r => r.storageCondition === storageCondition)
+        }
+        
+        if (enabled !== undefined && enabled !== '') {
+          const enabledBool = enabled === 'true'
+          reagents = reagents.filter(r => r.enabled === enabledBool)
+        }
       }
       
       const start = (page - 1) * pageSize

@@ -1,5 +1,12 @@
 export type HazardLevel = 'low' | 'medium' | 'high'
 
+export interface Attachment {
+  name: string
+  url: string
+  size?: number
+  uploadedAt?: string
+}
+
 export interface Reagent {
   id: string
   name: string
@@ -8,6 +15,19 @@ export interface Reagent {
   specification: string
   unit: string
   manufacturer?: string
+  brand?: string
+  catalogNumber?: string
+  purity?: string
+  concentration?: string
+  packagingSpec?: string
+  experimentTypes?: string[]
+  aliases?: string
+  openedValidity?: string
+  incompatibilities?: string
+  sdsAttachment?: Attachment
+  qcReportAttachment?: Attachment
+  reagentImage?: string
+  enabled: boolean
   storageCondition: string
   description?: string
   hazardLevel?: HazardLevel
@@ -22,6 +42,19 @@ export interface ReagentFormData {
   specification: string
   unit: string
   manufacturer?: string
+  brand?: string
+  catalogNumber?: string
+  purity?: string
+  concentration?: string
+  packagingSpec?: string
+  experimentTypes?: string[]
+  aliases?: string
+  openedValidity?: string
+  incompatibilities?: string
+  sdsAttachment?: Attachment
+  qcReportAttachment?: Attachment
+  reagentImage?: string
+  enabled: boolean
   storageCondition: string
   description?: string
   hazardLevel?: HazardLevel
@@ -38,6 +71,16 @@ export const hazardLevelColors: Record<HazardLevel, string> = {
   medium: 'bg-warning-50 text-warning-600',
   high: 'bg-danger-50 text-danger-600',
 }
+
+export const enabledStatusLabels = {
+  true: '启用',
+  false: '停用',
+} as const
+
+export const enabledStatusColors = {
+  true: 'bg-success-50 text-success-600',
+  false: 'bg-gray-100 text-gray-500',
+} as const
 
 export const reagentCategories = [
   '抗体',
@@ -59,4 +102,32 @@ export const storageConditions = [
   '-80°C',
   '避光',
   '无菌',
+]
+
+export const experimentTypeOptions = [
+  'PCR扩增',
+  'Western Blot',
+  'ELISA',
+  '细胞培养',
+  '免疫组化',
+  '核酸电泳',
+  '蛋白质电泳',
+  '液相色谱',
+  '气相色谱',
+  '荧光定量PCR',
+  '流式细胞术',
+  '其他',
+]
+
+export const commonBrands = [
+  'Sigma-Aldrich',
+  'Thermo Fisher',
+  'Invitrogen',
+  'Merck',
+  'HyClone',
+  'BD Biosciences',
+  'Biowest',
+  '国药集团',
+  '阿拉丁',
+  '麦克林',
 ]
