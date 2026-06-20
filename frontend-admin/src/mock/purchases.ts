@@ -15,10 +15,14 @@ import type {
   PurchaseStats,
   PurchaseItemType,
 } from '@/types/purchase'
+import type { BatchFormData } from '@/types/batch'
+import type { ConsumableOperationFormData } from '@/types/consumable'
 import { generateId, formatDate } from '@/utils/date'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
 import { addAuditLog } from './audit'
+import { mockCreateBatch } from './batches'
+import { mockConsumableOperation, mockGetConsumable } from './consumables'
 
 const REQUEST_STORAGE_KEY = 'mock_purchase_requests'
 const ORDER_STORAGE_KEY = 'mock_purchase_orders'
@@ -65,7 +69,11 @@ function getReceiveRecordsFromStorage(): PurchaseReceiveRecord[] {
   const data = localStorage.getItem(RECEIVE_STORAGE_KEY)
   if (data) {
     try {
-      return JSON.parse(data)
+      const records = JSON.parse(data)
+      return records.map((r: PurchaseReceiveRecord) => ({
+        ...r,
+        stockInStatus: r.stockInStatus || 'pending',
+      }))
     } catch {
       return []
     }
@@ -645,7 +653,7 @@ export async function mockSubmitPurchaseRequest(id: string): Promise<PurchaseReq
 export async function mockApprovePurchaseRequest(
   id: string,
   remark?: string
-): Promise<PurchaseRequest> {
+): Promise<{ request: PurchaseRequest; order?: PurchaseOrder }> {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
       const currentUser = getCurrentUser()
@@ -668,7 +676,7 @@ export async function mockApprovePurchaseRequest(
       }
 
       const now = formatDate(new Date())
-      const updated: PurchaseRequest = {
+      const updatedRequest: PurchaseRequest = {
         ...request,
         status: 'approved',
         approverId: currentUser.id,
@@ -678,21 +686,69 @@ export async function mockApprovePurchaseRequest(
         updatedAt: now,
       }
 
-      records[index] = updated
+      records[index] = updatedRequest
+
+      const orders = getOrdersFromStorage()
+      const orderItems: PurchaseItem[] = request.items.map(i => ({
+        ...i,
+        id: generateId(),
+        receivedQuantity: 0,
+        returnedQuantity: 0,
+      }))
+      const totalQuantity = orderItems.reduce((sum, i) => sum + i.quantity, 0)
+
+      const newOrder: PurchaseOrder = {
+        id: generateId(),
+        orderNo: generateOrderNo(),
+        title: request.title,
+        requestId: request.id,
+        requestNo: request.requestNo,
+        purchaserId: currentUser.id,
+        purchaserName: currentUser.name,
+        supplier: '',
+        status: 'pending',
+        itemType: request.itemType,
+        items: orderItems,
+        totalQuantity,
+        expectedDeliveryDate: request.expectedDeliveryDate,
+        orderDate: now,
+        remark: remark || '审批通过自动生成',
+        receivedQuantity: 0,
+        returnedQuantity: 0,
+        createdAt: now,
+        updatedAt: now,
+      }
+
+      orders.unshift(newOrder)
+      saveOrdersToStorage(orders)
+
+      updatedRequest.status = 'purchasing'
+      updatedRequest.purchaseOrderId = newOrder.id
+      updatedRequest.purchaseOrderNo = newOrder.orderNo
+      records[index] = updatedRequest
       saveRequestsToStorage(records)
 
       addAuditLog({
         module: 'purchase',
         operationType: 'purchase_request_approve',
         targetType: 'purchase_request',
-        targetId: updated.id,
-        targetName: updated.title,
+        targetId: updatedRequest.id,
+        targetName: updatedRequest.title,
         beforeContent: `状态: pending`,
-        afterContent: `状态: approved`,
-        remark: remark || '审批通过采购申请',
+        afterContent: `状态: purchasing, 已生成采购单 ${newOrder.orderNo}`,
+        remark: remark || '审批通过采购申请并自动生成采购单',
       })
 
-      resolve(updated)
+      addAuditLog({
+        module: 'purchase',
+        operationType: 'purchase_order_create',
+        targetType: 'purchase_order',
+        targetId: newOrder.id,
+        targetName: newOrder.title,
+        remark: `审批通过后自动从采购申请 ${request.requestNo} 生成采购单`,
+      })
+
+      resolve({ request: updatedRequest, order: newOrder })
     }, 200)
   })
 }
@@ -1102,6 +1158,7 @@ export async function mockReceivePurchaseItem(
         expiryDate: data.expiryDate,
         storageLocation: data.storageLocation,
         remark: data.remark,
+        stockInStatus: 'pending',
         createdAt: now,
       }
 
@@ -1147,12 +1204,141 @@ export async function mockReceivePurchaseItem(
         targetType: 'purchase_order',
         targetId: updatedOrder.id,
         targetName: updatedOrder.title,
-        afterContent: `${data.itemName} 到货 ${data.receivedQuantity} ${data.unit}`,
+        afterContent: `${data.itemName} 到货 ${data.receivedQuantity} ${data.unit}, 入库状态: 待入库`,
         remark: data.remark || '登记到货',
       })
 
       resolve(receiveRecord)
     }, 200)
+  })
+}
+
+export async function mockStockInReceiveRecord(
+  receiveRecordId: string
+): Promise<{ batchId?: string; consumableId?: string; success: boolean }> {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const currentUser = getCurrentUser()
+      if (!currentUser) {
+        reject(new Error('用户未登录'))
+        return
+      }
+
+      const receiveRecords = getReceiveRecordsFromStorage()
+      const recordIndex = receiveRecords.findIndex(r => r.id === receiveRecordId)
+      if (recordIndex === -1) {
+        reject(new Error('到货记录不存在'))
+        return
+      }
+
+      const record = receiveRecords[recordIndex]
+      if (record.stockInStatus === 'completed') {
+        reject(new Error('该到货记录已入库'))
+        return
+      }
+
+      const orders = getOrdersFromStorage()
+      const order = orders.find(o => o.id === record.orderId)
+      if (!order) {
+        reject(new Error('采购单不存在'))
+        return
+      }
+
+      const purchaseItem = order.items.find(i => i.id === record.itemId)
+
+      const now = formatDate(new Date())
+      let stockInId: string | undefined
+      let success = false
+
+      if (order.itemType === 'reagent') {
+        if (!record.batchNumber) {
+          reject(new Error('试剂入库必须填写批次号'))
+          return
+        }
+
+        const batchData: BatchFormData = {
+          reagentId: purchaseItem?.itemId || '',
+          batchNumber: record.batchNumber,
+          productionDate: record.productionDate || '',
+          expiryDate: record.expiryDate || '',
+          initialQuantity: record.receivedQuantity,
+          storageLocation: record.storageLocation || '室温',
+          receivedDate: record.receivedDate,
+          remark: record.remark ? `采购入库: ${record.remark}` : '采购入库',
+        }
+
+        const batch = await mockCreateBatch(batchData)
+        stockInId = batch.id
+        success = true
+
+        receiveRecords[recordIndex] = {
+          ...record,
+          stockInStatus: 'completed',
+          stockInId: batch.id,
+          stockInTime: now,
+        }
+      } else {
+        const consumableId = purchaseItem?.itemId
+        if (!consumableId) {
+          reject(new Error('耗材ID不存在'))
+          return
+        }
+
+        const consumable = await mockGetConsumable(consumableId)
+        if (!consumable) {
+          reject(new Error('耗材不存在，请先在耗材管理中创建该耗材'))
+          return
+        }
+
+        const operationData: ConsumableOperationFormData = {
+          type: 'receive',
+          quantity: record.receivedQuantity,
+          purpose: '采购入库',
+          remark: record.remark ? `采购到货入库: ${record.remark}` : '采购到货入库',
+        }
+
+        const operation = await mockConsumableOperation(consumableId, operationData)
+        stockInId = operation.id
+        success = true
+
+        receiveRecords[recordIndex] = {
+          ...record,
+          stockInStatus: 'completed',
+          stockInId: operation.id,
+          stockInTime: now,
+        }
+      }
+
+      saveReceiveRecordsToStorage(receiveRecords)
+
+      addAuditLog({
+        module: 'purchase',
+        operationType: 'receive',
+        targetType: order.itemType === 'reagent' ? 'reagent_batch' : 'consumable',
+        targetId: stockInId || '',
+        targetName: record.itemName,
+        beforeContent: `入库状态: 待入库`,
+        afterContent: `入库状态: 已完成, 数量: ${record.receivedQuantity} ${record.unit}`,
+        remark: `${order.itemType === 'reagent' ? '试剂批次' : '耗材库存'}入库成功, 批次号: ${record.batchNumber || 'N/A'}`,
+      })
+
+      resolve({
+        batchId: order.itemType === 'reagent' ? stockInId : undefined,
+        consumableId: order.itemType === 'consumable' ? purchaseItem?.itemId : undefined,
+        success,
+      })
+    } catch (e: any) {
+      const receiveRecords = getReceiveRecordsFromStorage()
+      const recordIndex = receiveRecords.findIndex(r => r.id === receiveRecordId)
+      if (recordIndex !== -1) {
+        receiveRecords[recordIndex] = {
+          ...receiveRecords[recordIndex],
+          stockInStatus: 'failed',
+        }
+        saveReceiveRecordsToStorage(receiveRecords)
+      }
+      reject(e)
+    }
   })
 }
 
@@ -1221,13 +1407,31 @@ export async function mockReturnPurchaseItem(
       }
 
       const totalReturned = updatedItems.reduce((sum, i) => sum + i.returnedQuantity, 0)
+      const totalReceived = updatedItems.reduce((sum, i) => sum + i.receivedQuantity, 0)
       const allReturned = updatedItems.every(i => i.returnedQuantity >= i.quantity)
+      const allFullyReceivedAfterReturn = updatedItems.every(
+        i => (i.receivedQuantity - i.returnedQuantity) >= i.quantity
+      )
+      const anyPartialReceived = updatedItems.some(
+        i => (i.receivedQuantity - i.returnedQuantity) > 0 && (i.receivedQuantity - i.returnedQuantity) < i.quantity
+      )
+
+      let newStatus: PurchaseOrderStatus = order.status
+      if (allReturned) {
+        newStatus = 'returned'
+      } else if (allFullyReceivedAfterReturn) {
+        newStatus = 'fully_received'
+      } else if (anyPartialReceived || totalReceived - totalReturned > 0) {
+        newStatus = 'partial_received'
+      } else {
+        newStatus = 'purchasing'
+      }
 
       const updatedOrder: PurchaseOrder = {
         ...order,
         items: updatedItems,
         returnedQuantity: totalReturned,
-        status: allReturned ? 'returned' : order.status === 'completed' ? 'partial_received' : order.status,
+        status: newStatus,
         updatedAt: now,
       }
 
@@ -1239,7 +1443,7 @@ export async function mockReturnPurchaseItem(
       if (requestIndex !== -1) {
         requests[requestIndex] = {
           ...requests[requestIndex],
-          status: allReturned ? 'returned' : requests[requestIndex].status === 'completed' ? 'partial_received' : requests[requestIndex].status,
+          status: newStatus,
           updatedAt: now,
         }
         saveRequestsToStorage(requests)
@@ -1251,7 +1455,8 @@ export async function mockReturnPurchaseItem(
         targetType: 'purchase_order',
         targetId: updatedOrder.id,
         targetName: updatedOrder.title,
-        afterContent: `${data.itemName} 退货 ${data.returnedQuantity} ${data.unit}`,
+        beforeContent: `状态: ${order.status}`,
+        afterContent: `状态: ${newStatus}, ${data.itemName} 退货 ${data.returnedQuantity} ${data.unit}`,
         remark: `退货原因: ${data.reason}`,
       })
 

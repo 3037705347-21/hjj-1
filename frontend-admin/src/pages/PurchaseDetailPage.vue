@@ -188,14 +188,7 @@ const canReject = computed(() => {
 })
 
 const canGenerateOrder = computed(() => {
-  if (viewType.value === 'order') {
-    return false
-  }
-  return (
-    hasPermission('purchase:order:create') &&
-    purchaseRequest.value?.status === 'approved' &&
-    !purchaseOrder.value
-  )
+  return false
 })
 
 const canStartPurchase = computed(() => {
@@ -299,12 +292,17 @@ const handleSubmit = async () => {
 }
 
 const handleApprove = async () => {
-  if (!confirm('确定要审批通过吗？')) return
+  if (!confirm('确定要审批通过吗？审批通过后将自动生成采购单。')) return
 
   actionLoading.value = true
   try {
-    await mockApprovePurchaseRequest(routeId.value)
-    await loadData()
+    const result = await mockApprovePurchaseRequest(routeId.value)
+    alert(`审批通过！已自动生成采购单 ${result.order?.orderNo || ''}`)
+    if (result.order) {
+      router.push(`/purchases/orders/${result.order.id}?type=order`)
+    } else {
+      await loadData()
+    }
   } catch (e: any) {
     alert(e.message || '审批失败')
   } finally {

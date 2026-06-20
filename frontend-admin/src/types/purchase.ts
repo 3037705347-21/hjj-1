@@ -123,6 +123,9 @@ export interface PurchaseReceiveRecord {
   expiryDate?: string
   storageLocation?: string
   remark?: string
+  stockInStatus: 'pending' | 'completed' | 'failed'
+  stockInId?: string
+  stockInTime?: string
   createdAt: string
 }
 

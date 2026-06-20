@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, watch } from 'vue'
-import { X, Package, CheckCircle, ArrowDownToLine, Undo2 } from 'lucide-vue-next'
+import { X, Package, CheckCircle, ArrowDownToLine, Undo2, Database, Loader2, AlertCircle } from 'lucide-vue-next'
 import type {
   PurchaseItem,
   PurchaseReceiveFormData,
@@ -13,6 +13,7 @@ import {
   mockReturnPurchaseItem,
   mockGetReceiveRecords,
   mockGetReturnRecords,
+  mockStockInReceiveRecord,
 } from '@/mock/purchases'
 import { formatDate } from '@/utils/date'
 import { storageConditions } from '@/types/reagent'
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 
 const activeTab = ref<'receive' | 'return'>('receive')
 const loading = ref(false)
+const stockInLoading = ref<string | null>(null)
 const receiveRecords = ref<PurchaseReceiveRecord[]>([])
 const returnRecords = ref<PurchaseReturnRecord[]>([])
 
@@ -162,7 +164,20 @@ const handleReceiveSubmit = async () => {
 
   loading.value = true
   try {
-    await mockReceivePurchaseItem(props.orderId, { ...receiveForm })
+    const record = await mockReceivePurchaseItem(props.orderId, { ...receiveForm })
+    
+    if (confirm(`到货登记成功！是否立即${props.itemType === 'reagent' ? '创建试剂批次' : '入库到耗材库存'}？`)) {
+      stockInLoading.value = record.id
+      try {
+        await mockStockInReceiveRecord(record.id)
+        alert(props.itemType === 'reagent' ? '试剂批次创建成功！' : '耗材入库成功！')
+      } catch (e: any) {
+        alert(`入库失败: ${e.message}`)
+      } finally {
+        stockInLoading.value = null
+      }
+    }
+    
     emit('success')
     await loadRecords()
     resetForms()
@@ -201,6 +216,42 @@ const handleReturnSubmit = async () => {
     alert(e.message || '退货失败')
   } finally {
     loading.value = false
+  }
+}
+
+const handleStockIn = async (record: PurchaseReceiveRecord) => {
+  if (!confirm(`确定要将此到货记录转入${props.itemType === 'reagent' ? '试剂批次' : '耗材库存'}吗？`)) return
+
+  stockInLoading.value = record.id
+  try {
+    const result = await mockStockInReceiveRecord(record.id)
+    if (result.success) {
+      alert(props.itemType === 'reagent' ? '试剂批次创建成功！' : '耗材入库成功！')
+      emit('success')
+      await loadRecords()
+    }
+  } catch (e: any) {
+    alert(`入库失败: ${e.message}`)
+  } finally {
+    stockInLoading.value = null
+  }
+}
+
+const getStockInStatusLabel = (status: string) => {
+  switch (status) {
+    case 'pending': return '待入库'
+    case 'completed': return '已入库'
+    case 'failed': return '入库失败'
+    default: return '未知'
+  }
+}
+
+const getStockInStatusClass = (status: string) => {
+  switch (status) {
+    case 'pending': return 'bg-amber-100 text-amber-700'
+    case 'completed': return 'bg-success-100 text-success-700'
+    case 'failed': return 'bg-danger-100 text-danger-700'
+    default: return 'bg-gray-100 text-gray-700'
   }
 }
 
@@ -453,30 +504,67 @@ const close = () => {
 
           <div v-if="receiveRecords.length > 0" class="mb-6">
             <h5 class="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">到货记录</h5>
-            <div class="space-y-2">
+            <div class="space-y-3">
               <div
                 v-for="record in receiveRecords"
                 :key="record.id"
-                class="p-3 bg-success-50 rounded-xl border border-success-100"
+                class="p-4 bg-success-50 rounded-xl border border-success-100"
               >
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-2">
-                    <ArrowDownToLine class="w-4 h-4 text-success-600" />
-                    <span class="font-medium text-gray-900">{{ record.itemName }}</span>
-                    <span class="text-success-600">+{{ record.receivedQuantity }} {{ record.unit }}</span>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex-1">
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <ArrowDownToLine class="w-4 h-4 text-success-600 flex-shrink-0" />
+                      <span class="font-medium text-gray-900">{{ record.itemName }}</span>
+                      <span class="text-success-600 font-semibold">+{{ record.receivedQuantity }} {{ record.unit }}</span>
+                      <span
+                        :class="[
+                          'inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium',
+                          getStockInStatusClass(record.stockInStatus),
+                        ]"
+                      >
+                        <template v-if="stockInLoading === record.id">
+                          <Loader2 class="w-3 h-3 mr-1 animate-spin" />
+                          入库中...
+                        </template>
+                        <template v-else-if="record.stockInStatus === 'failed'">
+                          <AlertCircle class="w-3 h-3 mr-1" />
+                        </template>
+                        <template v-else-if="record.stockInStatus === 'completed'">
+                          <Database class="w-3 h-3 mr-1" />
+                        </template>
+                        {{ getStockInStatusLabel(record.stockInStatus) }}
+                      </span>
+                    </div>
+                    <div v-if="record.batchNumber" class="mt-2 text-sm text-gray-600">
+                      批次号: {{ record.batchNumber }}
+                      <span v-if="record.expiryDate"> | 有效期: {{ record.expiryDate }}</span>
+                      <span v-if="record.storageLocation"> | 存储: {{ record.storageLocation }}</span>
+                    </div>
+                    <div v-if="record.stockInTime" class="mt-1 text-xs text-gray-500">
+                      入库时间: {{ record.stockInTime }}
+                    </div>
+                    <div v-if="record.remark" class="mt-1 text-sm text-gray-500">
+                      备注: {{ record.remark }}
+                    </div>
+                    <div class="mt-1 text-xs text-gray-500 flex items-center justify-between">
+                      <span>登记人: {{ record.receiverName }} | {{ record.createdAt }}</span>
+                    </div>
                   </div>
-                  <span class="text-xs text-gray-500">{{ record.createdAt }}</span>
-                </div>
-                <div v-if="record.batchNumber" class="mt-2 text-sm text-gray-600">
-                  批次号: {{ record.batchNumber }}
-                  <span v-if="record.expiryDate"> | 有效期: {{ record.expiryDate }}</span>
-                  <span v-if="record.storageLocation"> | 存储: {{ record.storageLocation }}</span>
-                </div>
-                <div v-if="record.remark" class="mt-1 text-sm text-gray-500">
-                  备注: {{ record.remark }}
-                </div>
-                <div class="mt-1 text-xs text-gray-500">
-                  登记人: {{ record.receiverName }}
+                  <div v-if="record.stockInStatus === 'pending' || record.stockInStatus === 'failed'" class="flex-shrink-0">
+                    <button
+                      class="px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-1 disabled:opacity-50"
+                      :disabled="stockInLoading === record.id"
+                      @click="handleStockIn(record)"
+                    >
+                      <template v-if="stockInLoading === record.id">
+                        <Loader2 class="w-3.5 h-3.5 animate-spin" />
+                      </template>
+                      <template v-else>
+                        <Database class="w-3.5 h-3.5" />
+                      </template>
+                      {{ itemType === 'reagent' ? '创建批次' : '入库' }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>

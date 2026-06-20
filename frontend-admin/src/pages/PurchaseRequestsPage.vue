@@ -428,10 +428,13 @@ const openApproveConfirm = (request: PurchaseRequest) => {
 const handleApprove = async () => {
   if (!currentRequest.value) return
   try {
-    await mockApprovePurchaseRequest(currentRequest.value.id)
+    const result = await mockApprovePurchaseRequest(currentRequest.value.id)
     showApproveConfirm.value = false
     fetchData()
     fetchStats()
+    if (result.order && confirm(`审批通过！已自动生成采购单 ${result.order.orderNo}，是否立即查看？`)) {
+      router.push(`/purchases/orders/${result.order.id}?type=order`)
+    }
   } catch (e: any) {
     alert(e.message || '审批失败')
   }
