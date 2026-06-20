@@ -122,12 +122,12 @@ const fetchStats = async () => {
     const s = await mockGetPurchaseStats()
     stats.value = {
       total: s.totalOrders,
-      pending: 0,
-      purchasing: s.purchasing,
-      partialReceived: s.partialReceived,
-      fullyReceived: s.fullyReceived,
-      completed: s.completed,
-      returned: s.returned,
+      pending: s.pendingOrders,
+      purchasing: s.purchasingOrders,
+      partialReceived: s.partialReceivedOrders,
+      fullyReceived: s.fullyReceivedOrders,
+      completed: s.completedOrders,
+      returned: s.returnedOrders,
     }
   } catch (e) {
     console.error('Failed to fetch stats', e)

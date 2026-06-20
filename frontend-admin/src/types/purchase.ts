@@ -259,4 +259,10 @@ export interface PurchaseStats {
   returned: number
   rejected: number
   totalOrders: number
+  pendingOrders: number
+  purchasingOrders: number
+  partialReceivedOrders: number
+  fullyReceivedOrders: number
+  completedOrders: number
+  returnedOrders: number
 }

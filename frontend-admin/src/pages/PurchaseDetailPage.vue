@@ -64,7 +64,7 @@ const receiveDialogVisible = ref(false)
 const actionLoading = ref(false)
 
 const routeId = computed(() => route.params.id as string)
-const viewType = computed(() => (route.query.type === 'order' ? 'order' : 'request'))
+const viewType = computed(() => (route.name === 'purchase-order-detail' ? 'order' : 'request'))
 
 const currentStatus = computed(() => {
   if (viewType.value === 'order' && purchaseOrder.value) {
@@ -173,7 +173,7 @@ const canApprove = computed(() => {
   }
   return (
     hasPermission('purchase:request:approve') &&
-    purchaseRequest.value?.status === 'approving'
+    purchaseRequest.value?.status === 'pending'
   )
 })
 
@@ -183,7 +183,7 @@ const canReject = computed(() => {
   }
   return (
     hasPermission('purchase:request:approve') &&
-    purchaseRequest.value?.status === 'approving'
+    purchaseRequest.value?.status === 'pending'
   )
 })
 
@@ -299,7 +299,7 @@ const handleApprove = async () => {
     const result = await mockApprovePurchaseRequest(routeId.value)
     alert(`审批通过！已自动生成采购单 ${result.order?.orderNo || ''}`)
     if (result.order) {
-      router.push(`/purchases/orders/${result.order.id}?type=order`)
+      router.push(`/purchases/orders/${result.order.id}`)
     } else {
       await loadData()
     }

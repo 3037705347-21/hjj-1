@@ -195,7 +195,7 @@ function initMockRequests(): PurchaseRequest[] {
       title: '实验耗材采购申请',
       itemType: 'consumable',
       items: [mockItems[2], mockItems[3]],
-      status: 'approving',
+      status: 'pending',
       expectedDeliveryDate: formatDate(new Date(now.getTime() + 5 * 24 * 60 * 60 * 1000)),
       purpose: '日常实验耗材',
       reason: '消耗量大，库存不足',
@@ -358,7 +358,7 @@ function initMockOrders(): PurchaseOrder[] {
   }> = [
     {
       request: requests[2],
-      status: 'purchasing',
+      status: 'pending',
       supplier: 'Thermo Fisher Scientific',
       purchaser: '张主任',
       orderDate: formatDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000)),
@@ -722,7 +722,7 @@ export async function mockApprovePurchaseRequest(
       orders.unshift(newOrder)
       saveOrdersToStorage(orders)
 
-      updatedRequest.status = 'purchasing'
+      updatedRequest.status = 'approved'
       updatedRequest.purchaseOrderId = newOrder.id
       updatedRequest.purchaseOrderNo = newOrder.orderNo
       records[index] = updatedRequest
@@ -735,7 +735,7 @@ export async function mockApprovePurchaseRequest(
         targetId: updatedRequest.id,
         targetName: updatedRequest.title,
         beforeContent: `状态: pending`,
-        afterContent: `状态: purchasing, 已生成采购单 ${newOrder.orderNo}`,
+        afterContent: `状态: approved, 已生成采购单 ${newOrder.orderNo}`,
         remark: remark || '审批通过采购申请并自动生成采购单',
       })
 
@@ -1545,7 +1545,7 @@ export async function mockGetPurchaseStats(): Promise<PurchaseStats> {
       const orders = getOrdersFromStorage()
       resolve({
         totalRequests: requests.length,
-        pendingApproval: requests.filter(r => r.status === 'pending' || r.status === 'approving').length,
+        pendingApproval: requests.filter(r => r.status === 'pending').length,
         purchasing: requests.filter(r => r.status === 'purchasing').length,
         partialReceived: requests.filter(r => r.status === 'partial_received').length,
         fullyReceived: requests.filter(r => r.status === 'fully_received').length,
@@ -1553,6 +1553,12 @@ export async function mockGetPurchaseStats(): Promise<PurchaseStats> {
         returned: requests.filter(r => r.status === 'returned').length,
         rejected: requests.filter(r => r.status === 'rejected').length,
         totalOrders: orders.length,
+        pendingOrders: orders.filter(o => o.status === 'pending').length,
+        purchasingOrders: orders.filter(o => o.status === 'purchasing').length,
+        partialReceivedOrders: orders.filter(o => o.status === 'partial_received').length,
+        fullyReceivedOrders: orders.filter(o => o.status === 'fully_received').length,
+        completedOrders: orders.filter(o => o.status === 'completed').length,
+        returnedOrders: orders.filter(o => o.status === 'returned').length,
       })
     }, 100)
   })
