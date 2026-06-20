@@ -340,7 +340,8 @@ const handleGenerateOrder = async () => {
   try {
     const order = await mockCreatePurchaseOrder(routeId.value, {
       title: purchaseRequest.value?.title || '采购单',
-      supplier: '',
+      supplierId: undefined,
+      supplierName: undefined,
       purchaserId: userStore.state.user?.id || '',
       purchaserName: userStore.state.user?.name || '',
       orderDate: formatDate(new Date()),
@@ -545,7 +546,7 @@ const handleReceiveSuccess = () => {
             </div>
             <div class="p-4 bg-primary-50 rounded-xl">
               <div class="text-xs text-gray-500 mb-1">供应商</div>
-              <div class="font-medium text-gray-900">{{ purchaseOrder.supplier || '-' }}</div>
+              <div class="font-medium text-gray-900">{{ purchaseOrder.supplierName || '-' }}</div>
             </div>
             <div class="p-4 bg-primary-50 rounded-xl">
               <div class="text-xs text-gray-500 mb-1">采购员</div>

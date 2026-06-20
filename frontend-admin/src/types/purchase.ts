@@ -91,7 +91,8 @@ export interface PurchaseOrder {
   requestNo: string
   purchaserId?: string
   purchaserName?: string
-  supplier?: string
+  supplierId?: string
+  supplierName?: string
   status: PurchaseOrderStatus
   statusLabel?: string
   itemType: PurchaseItemType
@@ -155,7 +156,8 @@ export interface PurchaseRequestFormData {
 
 export interface PurchaseOrderFormData {
   title: string
-  supplier?: string
+  supplierId?: string
+  supplierName?: string
   purchaserId?: string
   purchaserName?: string
   orderDate?: string

@@ -9,6 +9,8 @@ export interface Consumable {
   manufacturer?: string
   location?: string
   description?: string
+  supplierIds?: string[]
+  defaultSupplierId?: string
   createdAt: string
   updatedAt: string
 }
@@ -23,6 +25,8 @@ export interface ConsumableFormData {
   manufacturer?: string
   location?: string
   description?: string
+  supplierIds?: string[]
+  defaultSupplierId?: string
 }
 
 export type ConsumableOperationType =

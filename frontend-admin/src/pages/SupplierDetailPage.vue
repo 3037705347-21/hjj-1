@@ -46,6 +46,10 @@ import {
   exceptionLevelLabels,
 } from '@/types/supplier'
 import {
+  purchaseOrderStatusLabels,
+  purchaseOrderStatusColors,
+} from '@/types/purchase'
+import {
   mockGetSupplierDetail,
   mockAddQualification,
   mockDeleteQualification,
@@ -59,7 +63,7 @@ const permission = usePermission()
 
 const loading = ref(false)
 const supplier = ref<SupplierDetail | null>(null)
-const activeTab = ref<'info' | 'qualifications' | 'priceHistory' | 'deliveries' | 'exceptions'>('info')
+const activeTab = ref<'info' | 'qualifications' | 'orders' | 'priceHistory' | 'deliveries' | 'exceptions'>('info')
 
 const showQualificationModal = ref(false)
 const qualificationForm = reactive({
@@ -354,6 +358,26 @@ onMounted(() => {
         <button
           class="px-6 py-4 text-sm font-medium border-b-2 transition-colors"
           :class="[
+            activeTab === 'orders'
+              ? 'border-primary-600 text-primary-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200',
+          ]"
+          @click="handleTabChange('orders')"
+        >
+          <span class="flex items-center gap-2">
+            <FileText class="w-4 h-4" />
+            关联采购单
+            <span
+              v-if="supplier?.purchaseOrders?.length"
+              class="px-1.5 py-0.5 text-xs rounded-full bg-gray-100 text-gray-500"
+            >
+              {{ supplier.purchaseOrders.length }}
+            </span>
+          </span>
+        </button>
+        <button
+          class="px-6 py-4 text-sm font-medium border-b-2 transition-colors"
+          :class="[
             activeTab === 'priceHistory'
               ? 'border-primary-600 text-primary-600'
               : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-200',
@@ -605,6 +629,73 @@ onMounted(() => {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div v-else-if="activeTab === 'orders'" class="space-y-4">
+          <p class="text-sm text-gray-500">
+            共 {{ supplier?.purchaseOrders?.length || 0 }} 条关联采购单
+          </p>
+
+          <div
+            v-if="!supplier?.purchaseOrders?.length"
+            class="p-12 text-center"
+          >
+            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+              <FileText class="w-8 h-8 text-gray-300" />
+            </div>
+            <p class="text-gray-400">暂无关联采购单</p>
+          </div>
+
+          <div v-else class="overflow-x-auto -mx-6">
+            <table class="w-full">
+              <thead class="bg-gray-50 border-b border-gray-100">
+                <tr>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">采购单号</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">标题</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">关联申请</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">采购员</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">进度</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
+                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">创建时间</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-gray-100">
+                <tr
+                  v-for="order in supplier.purchaseOrders"
+                  :key="order.id"
+                  class="hover:bg-gray-50 transition-colors cursor-pointer"
+                  @click="router.push(`/purchases/orders/${order.id}`)"
+                >
+                  <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ order.orderNo }}</td>
+                  <td class="px-6 py-4 text-sm text-gray-700">{{ order.title }}</td>
+                  <td class="px-6 py-4 text-sm text-gray-500">{{ order.requestNo }}</td>
+                  <td class="px-6 py-4 text-sm text-gray-600">{{ order.purchaserName || '-' }}</td>
+                  <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                      <div class="flex-1 max-w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          class="h-full bg-success-500 rounded-full transition-all"
+                          :style="{ width: `${order.totalQuantity > 0 ? (order.receivedQuantity / order.totalQuantity) * 100 : 0}%` }"
+                        />
+                      </div>
+                      <span class="text-sm text-gray-600 whitespace-nowrap">
+                        {{ order.receivedQuantity }}/{{ order.totalQuantity }}
+                      </span>
+                    </div>
+                  </td>
+                  <td class="px-6 py-4">
+                    <span
+                      class="inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full"
+                      :class="purchaseOrderStatusColors[order.status]"
+                    >
+                      {{ purchaseOrderStatusLabels[order.status] }}
+                    </span>
+                  </td>
+                  <td class="px-6 py-4 text-sm text-gray-500">{{ order.createdAt }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 

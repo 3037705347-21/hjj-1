@@ -46,6 +46,8 @@ import {
   mockCompletePurchaseOrder,
   mockGetPurchaseStats,
 } from '@/mock/purchases'
+import { mockGetAllSuppliers } from '@/mock/suppliers'
+import type { Supplier } from '@/types/supplier'
 import { useSavedFilters } from '@/composables/useSavedFilters'
 import type { SavedFilter } from '@/composables/useSavedFilters'
 
@@ -91,15 +93,36 @@ const showCompleteConfirm = ref(false)
 
 const currentOrder = ref<PurchaseOrder | null>(null)
 const formLoading = ref(false)
+const supplierList = ref<Supplier[]>([])
 
 const formData = reactive<PurchaseOrderFormData>({
   title: '',
-  supplier: '',
+  supplierId: undefined,
+  supplierName: undefined,
   purchaserName: '',
   orderDate: '',
   expectedDeliveryDate: '',
   remark: '',
 })
+
+const fetchSuppliers = async () => {
+  try {
+    supplierList.value = await mockGetAllSuppliers()
+  } catch (e) {
+    console.error('Failed to fetch suppliers', e)
+  }
+}
+
+const handleSupplierChange = (supplierId: string) => {
+  const supplier = supplierList.value.find(s => s.id === supplierId)
+  if (supplier) {
+    formData.supplierId = supplier.id
+    formData.supplierName = supplier.name
+  } else {
+    formData.supplierId = undefined
+    formData.supplierName = undefined
+  }
+}
 
 const fetchData = async () => {
   loading.value = true
@@ -175,7 +198,8 @@ const totalPages = computed(() => {
 const openEditModal = (order: PurchaseOrder) => {
   currentOrder.value = order
   formData.title = order.title
-  formData.supplier = order.supplier || ''
+  formData.supplierId = order.supplierId
+  formData.supplierName = order.supplierName
   formData.purchaserName = order.purchaserName || ''
   formData.orderDate = order.orderDate || ''
   formData.expectedDeliveryDate = order.expectedDeliveryDate || ''
@@ -249,6 +273,7 @@ onMounted(() => {
   loadFilters()
   fetchData()
   fetchStats()
+  fetchSuppliers()
 })
 </script>
 
@@ -396,7 +421,7 @@ onMounted(() => {
                 <span class="text-sm text-gray-600">{{ item.requestNo }}</span>
               </td>
               <td class="px-6 py-4">
-                <span class="text-sm text-gray-600">{{ item.supplier || '-' }}</span>
+                <span class="text-sm text-gray-600">{{ item.supplierName || '-' }}</span>
               </td>
               <td class="px-6 py-4">
                 <div class="flex items-center gap-2">
@@ -527,12 +552,20 @@ onMounted(() => {
           <div class="grid grid-cols-2 gap-4">
             <div class="space-y-2">
               <label class="block text-sm font-medium text-gray-700">供应商</label>
-              <input
-                v-model="formData.supplier"
-                type="text"
+              <select
+                :value="formData.supplierId"
+                @change="handleSupplierChange(($event.target as HTMLSelectElement).value)"
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
-                placeholder="请输入供应商名称"
-              />
+              >
+                <option value="">请选择供应商</option>
+                <option
+                  v-for="supplier in supplierList.filter(s => s.status === 'active')"
+                  :key="supplier.id"
+                  :value="supplier.id"
+                >
+                  {{ supplier.name }}
+                </option>
+              </select>
             </div>
             <div class="space-y-2">
               <label class="block text-sm font-medium text-gray-700">采购员</label>

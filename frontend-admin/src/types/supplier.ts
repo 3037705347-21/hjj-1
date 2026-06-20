@@ -1,3 +1,5 @@
+import type { PurchaseOrder } from './purchase'
+
 export type SupplierStatus = 'active' | 'inactive' | 'pending' | 'blacklisted'
 
 export type SupplierRating = 'A' | 'B' | 'C' | 'D'
@@ -120,6 +122,7 @@ export interface SupplierDetail extends Supplier {
   priceHistory: SupplierPriceHistory[]
   deliveryRecords: SupplierDeliveryRecord[]
   exceptionRecords: SupplierExceptionRecord[]
+  purchaseOrders: PurchaseOrder[]
 }
 
 export interface SupplierFilterParams {

@@ -350,7 +350,8 @@ function initMockOrders(): PurchaseOrder[] {
   const orderData: Array<{
     request: PurchaseRequest
     status: PurchaseOrderStatus
-    supplier?: string
+    supplierId?: string
+    supplierName?: string
     purchaser?: string
     orderDate?: string
     actualDeliveryDate?: string
@@ -359,7 +360,8 @@ function initMockOrders(): PurchaseOrder[] {
     {
       request: requests[2],
       status: 'pending',
-      supplier: 'Thermo Fisher Scientific',
+      supplierId: 'sup_001',
+      supplierName: '上海生化试剂有限公司',
       purchaser: '张主任',
       orderDate: formatDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000)),
       receivedQuantity: 0,
@@ -367,7 +369,8 @@ function initMockOrders(): PurchaseOrder[] {
     {
       request: requests[3],
       status: 'purchasing',
-      supplier: 'Abcam',
+      supplierId: 'sup_001',
+      supplierName: '上海生化试剂有限公司',
       purchaser: '李采购员',
       orderDate: formatDate(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000)),
       receivedQuantity: 0,
@@ -375,7 +378,8 @@ function initMockOrders(): PurchaseOrder[] {
     {
       request: requests[4],
       status: 'partial_received',
-      supplier: '赛默飞世尔科技',
+      supplierId: 'sup_001',
+      supplierName: '上海生化试剂有限公司',
       purchaser: '王采购',
       orderDate: formatDate(new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000)),
       actualDeliveryDate: formatDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000)),
@@ -384,7 +388,8 @@ function initMockOrders(): PurchaseOrder[] {
     {
       request: requests[5],
       status: 'completed',
-      supplier: 'Eppendorf',
+      supplierId: 'sup_002',
+      supplierName: '北京实验器材股份有限公司',
       purchaser: '张主任',
       orderDate: formatDate(new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000)),
       actualDeliveryDate: formatDate(new Date(now.getTime() - 8 * 24 * 60 * 60 * 1000)),
@@ -409,7 +414,8 @@ function initMockOrders(): PurchaseOrder[] {
       requestNo: item.request.requestNo,
       purchaserId: 'user_manager_1',
       purchaserName: item.purchaser,
-      supplier: item.supplier,
+      supplierId: item.supplierId,
+      supplierName: item.supplierName,
       status: item.status,
       itemType: item.request.itemType,
       items,
@@ -705,7 +711,8 @@ export async function mockApprovePurchaseRequest(
         requestNo: request.requestNo,
         purchaserId: currentUser.id,
         purchaserName: currentUser.name,
-        supplier: '',
+        supplierId: undefined,
+        supplierName: undefined,
         status: 'pending',
         itemType: request.itemType,
         items: orderItems,
@@ -888,7 +895,8 @@ export async function mockCreatePurchaseOrder(
         requestNo: request.requestNo,
         purchaserId: data.purchaserId || currentUser.id,
         purchaserName: data.purchaserName || currentUser.name,
-        supplier: data.supplier,
+        supplierId: data.supplierId,
+        supplierName: data.supplierName,
         status: 'pending',
         itemType: request.itemType,
         items,
@@ -945,7 +953,7 @@ export async function mockGetPurchaseOrders(
               r.title.toLowerCase().includes(kw) ||
               r.orderNo.toLowerCase().includes(kw) ||
               r.requestNo.toLowerCase().includes(kw) ||
-              r.supplier?.toLowerCase().includes(kw) ||
+              r.supplierName?.toLowerCase().includes(kw) ||
               r.items.some(i => i.itemName.toLowerCase().includes(kw))
           )
         }
@@ -1025,7 +1033,8 @@ export async function mockUpdatePurchaseOrder(
       const updated: PurchaseOrder = {
         ...order,
         title: data.title || order.title,
-        supplier: data.supplier ?? order.supplier,
+        supplierId: data.supplierId ?? order.supplierId,
+        supplierName: data.supplierName ?? order.supplierName,
         purchaserId: data.purchaserId ?? order.purchaserId,
         purchaserName: data.purchaserName ?? order.purchaserName,
         orderDate: data.orderDate ?? order.orderDate,

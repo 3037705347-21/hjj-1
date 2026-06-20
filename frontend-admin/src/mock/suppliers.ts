@@ -8,11 +8,14 @@ import type {
   SupplierDeliveryRecord,
   SupplierExceptionRecord,
 } from '@/types/supplier'
+import type { PurchaseOrder } from '@/types/purchase'
 import type { PageResult } from '@/types/common'
 import { generateId } from '@/utils/date'
 import { addAuditLog } from './audit'
 import type { User } from '@/types/user'
 import { storage } from '@/utils/storage'
+
+const PURCHASE_ORDER_STORAGE_KEY = 'mock_purchase_orders'
 
 const STORAGE_KEY = 'mock_suppliers'
 const QUALIFICATION_STORAGE_KEY = 'mock_supplier_qualifications'
@@ -102,6 +105,118 @@ function getExceptionRecordsFromStorage(): SupplierExceptionRecord[] {
 
 function saveExceptionRecordsToStorage(records: SupplierExceptionRecord[]): void {
   localStorage.setItem(EXCEPTION_RECORDS_STORAGE_KEY, JSON.stringify(records))
+}
+
+function getPurchaseOrdersFromStorage(): PurchaseOrder[] {
+  const data = localStorage.getItem(PURCHASE_ORDER_STORAGE_KEY)
+  if (data) {
+    try {
+      return JSON.parse(data)
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function getSupplierPurchaseOrders(supplierId: string): PurchaseOrder[] {
+  const allOrders = getPurchaseOrdersFromStorage()
+  return allOrders.filter(o => o.supplierId === supplierId)
+}
+
+function generateDeliveryRecordsFromOrders(supplierId: string, orders: PurchaseOrder[]): SupplierDeliveryRecord[] {
+  const records: SupplierDeliveryRecord[] = []
+  orders.forEach(order => {
+    if (order.status === 'partial_received' || order.status === 'fully_received' || order.status === 'completed') {
+      const expectedDate = order.expectedDeliveryDate || order.createdAt
+      const actualDate = order.actualDeliveryDate || order.updatedAt
+      const expected = new Date(expectedDate)
+      const actual = new Date(actualDate)
+      const delayDays = Math.ceil((actual.getTime() - expected.getTime()) / (1000 * 60 * 60 * 24))
+      const isOnTime = delayDays <= 0
+
+      records.push({
+        id: `delivery_${order.id}`,
+        supplierId,
+        orderId: order.id,
+        orderNo: order.orderNo,
+        expectedDate,
+        actualDate,
+        isOnTime,
+        delayDays: isOnTime ? 0 : delayDays,
+        items: order.items.map(item => ({
+          itemId: item.itemId,
+          itemName: item.itemName,
+          quantity: item.quantity,
+          receivedQuantity: item.receivedQuantity,
+        })),
+        remark: order.remark,
+      })
+    }
+  })
+  return records.sort((a, b) => new Date(b.actualDate).getTime() - new Date(a.actualDate).getTime())
+}
+
+function generatePriceHistoryFromOrders(supplierId: string, orders: PurchaseOrder[]): SupplierPriceHistory[] {
+  const history: SupplierPriceHistory[] = []
+  orders.forEach(order => {
+    order.items.forEach(item => {
+      if (item.unitPrice && item.unitPrice > 0) {
+        history.push({
+          id: `price_${order.id}_${item.itemId}`,
+          supplierId,
+          itemType: item.itemType,
+          itemId: item.itemId,
+          itemName: item.itemName,
+          specification: item.specification,
+          unit: item.unit,
+          unitPrice: item.unitPrice,
+          quoteDate: order.orderDate || order.createdAt,
+          validFrom: order.orderDate || order.createdAt,
+        })
+      }
+    })
+  })
+  if (history.length === 0) {
+    orders.forEach(order => {
+      order.items.forEach(item => {
+        const mockPrice = item.itemType === 'reagent' ? 200 + Math.random() * 800 : 10 + Math.random() * 100
+        history.push({
+          id: `price_${order.id}_${item.itemId}`,
+          supplierId,
+          itemType: item.itemType,
+          itemId: item.itemId,
+          itemName: item.itemName,
+          specification: item.specification,
+          unit: item.unit,
+          unitPrice: Math.round(mockPrice * 100) / 100,
+          quoteDate: order.orderDate || order.createdAt,
+          validFrom: order.orderDate || order.createdAt,
+        })
+      })
+    })
+  }
+  return history.sort((a, b) => new Date(b.quoteDate).getTime() - new Date(a.quoteDate).getTime())
+}
+
+function calculateSupplierStats(supplierId: string, orders: PurchaseOrder[]): { totalOrders: number; totalAmount: number; onTimeDeliveryRate: number; qualityPassRate: number } {
+  const totalOrders = orders.length
+  const totalAmount = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0)
+
+  const deliveryRecords = generateDeliveryRecordsFromOrders(supplierId, orders)
+  const onTimeCount = deliveryRecords.filter(r => r.isOnTime).length
+  const onTimeDeliveryRate = deliveryRecords.length > 0
+    ? Math.round((onTimeCount / deliveryRecords.length) * 1000) / 10
+    : 95.0
+
+  const qualityPassRate = 95 + Math.random() * 4
+
+  return {
+    totalOrders,
+    totalAmount,
+    onTimeDeliveryRate,
+    qualityPassRate: Math.round(qualityPassRate * 10) / 10,
+  }
 }
 
 function initMockSuppliers(): Supplier[] {
@@ -567,6 +682,15 @@ export function mockGetSupplier(id: string): Promise<Supplier | null> {
   })
 }
 
+export function mockGetSupplierPurchaseOrders(supplierId: string): Promise<PurchaseOrder[]> {
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      const orders = getSupplierPurchaseOrders(supplierId)
+      resolve(orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()))
+    }, 200)
+  })
+}
+
 export function mockGetSupplierDetail(id: string): Promise<SupplierDetail | null> {
   return new Promise((resolve) => {
     setTimeout(() => {
@@ -581,27 +705,24 @@ export function mockGetSupplierDetail(id: string): Promise<SupplierDetail | null
       const allQualifications = getQualificationsFromStorage()
       const qualifications = allQualifications.filter((q) => q.supplierId === id)
 
-      const allPriceHistory = getPriceHistoryFromStorage()
-      const priceHistory = allPriceHistory
-        .filter((p) => p.supplierId === id)
-        .sort((a, b) => new Date(b.quoteDate).getTime() - new Date(a.quoteDate).getTime())
-
-      const allDeliveryRecords = getDeliveryRecordsFromStorage()
-      const deliveryRecords = allDeliveryRecords
-        .filter((d) => d.supplierId === id)
-        .sort((a, b) => new Date(b.actualDate).getTime() - new Date(a.actualDate).getTime())
-
       const allExceptionRecords = getExceptionRecordsFromStorage()
       const exceptionRecords = allExceptionRecords
         .filter((e) => e.supplierId === id)
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
+      const purchaseOrders = getSupplierPurchaseOrders(id)
+      const deliveryRecords = generateDeliveryRecordsFromOrders(id, purchaseOrders)
+      const priceHistory = generatePriceHistoryFromOrders(id, purchaseOrders)
+      const stats = calculateSupplierStats(id, purchaseOrders)
+
       resolve({
         ...supplier,
+        ...stats,
         qualifications,
         priceHistory,
         deliveryRecords,
         exceptionRecords,
+        purchaseOrders: purchaseOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
       })
     }, 300)
   })
