@@ -14,6 +14,8 @@ import SystemSettingsPage from '@/pages/SystemSettingsPage.vue'
 import PurchaseRequestsPage from '@/pages/PurchaseRequestsPage.vue'
 import PurchaseOrdersPage from '@/pages/PurchaseOrdersPage.vue'
 import PurchaseDetailPage from '@/pages/PurchaseDetailPage.vue'
+import SuppliersPage from '@/pages/SuppliersPage.vue'
+import SupplierDetailPage from '@/pages/SupplierDetailPage.vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
 
@@ -108,6 +110,18 @@ const routes: RouteRecordRaw[] = [
         name: 'purchase-order-detail',
         component: PurchaseDetailPage,
         meta: { title: '采购单详情', permissions: ['purchase:order:view'] },
+      },
+      {
+        path: 'suppliers',
+        name: 'suppliers',
+        component: SuppliersPage,
+        meta: { title: '供应商管理', permissions: ['supplier:view'] },
+      },
+      {
+        path: 'suppliers/:id',
+        name: 'supplier-detail',
+        component: SupplierDetailPage,
+        meta: { title: '供应商详情', permissions: ['supplier:view'] },
       },
       {
         path: 'system-settings',

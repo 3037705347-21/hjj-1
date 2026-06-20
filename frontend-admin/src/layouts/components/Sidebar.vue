@@ -17,6 +17,7 @@ import {
   FileCheck,
   ShoppingCart,
   ClipboardList,
+  Building2,
 } from 'lucide-vue-next'
 import { getUserStore } from '@/stores/user'
 import { roleLabels } from '@/types/user'
@@ -50,6 +51,7 @@ const allMenuItems: MenuItem[] = [
   { path: '/consumables', name: '耗材管理', icon: PackageOpen, permission: 'consumable:view' },
   { path: '/purchases', name: '采购申请', icon: ClipboardList, permission: 'purchase:request:view' },
   { path: '/purchase-orders', name: '采购单', icon: ShoppingCart, permission: 'purchase:order:view' },
+  { path: '/suppliers', name: '供应商管理', icon: Building2, permission: 'supplier:view' },
   { path: '/alerts', name: '预警中心', icon: AlertTriangle, permission: 'alert:view' },
   { path: '/approvals', name: '审批管理', icon: FileCheck, permission: 'approval:view' },
   { path: '/audit-logs', name: '审计日志', icon: FileText, permission: 'audit:view' },

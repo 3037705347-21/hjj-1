@@ -9,6 +9,7 @@ export type AuditModule =
   | 'approval'
   | 'system'
   | 'purchase'
+  | 'supplier'
 
 export type AuditOperationType =
   | 'login'
@@ -99,6 +100,7 @@ export const auditModuleLabels: Record<AuditModule, string> = {
   approval: '审批管理',
   system: '系统配置',
   purchase: '采购管理',
+  supplier: '供应商管理',
 }
 
 export const auditOperationTypeLabels: Record<AuditOperationType, string> = {

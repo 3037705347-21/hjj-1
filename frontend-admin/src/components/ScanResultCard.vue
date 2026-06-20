@@ -291,10 +291,8 @@ onMounted(() => {
           </div>
 
           <template v-else-if="entityData && entityType">
-            <div
-              v-if="reagentInfo"
-              class="space-y-4"
-            >
+            <template v-if="reagentInfo">
+              <div class="space-y-4">
               <div class="flex items-start gap-4 p-4 rounded-xl bg-gradient-to-br from-indigo-50 to-primary-50 border border-indigo-100">
                 <div class="w-14 h-14 rounded-xl bg-white shadow-sm flex items-center justify-center flex-shrink-0">
                   <span class="text-2xl">🧪</span>
@@ -352,6 +350,7 @@ onMounted(() => {
                   <div class="text-[11px] text-gray-500 mb-1">CAS 号</div>
                   <div class="text-sm font-semibold text-gray-800 truncate">{{ reagentInfo.casNumber || '-' }}</div>
                 </div>
+              </div>
               </div>
             </template>
 

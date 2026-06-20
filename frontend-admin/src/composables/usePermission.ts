@@ -73,6 +73,14 @@ export function usePermission() {
   const canViewAuditLogs = computed(() => hasPermission('audit:view'))
   const canExportAuditLogs = computed(() => hasPermission('audit:export'))
 
+  const canViewSuppliers = computed(() => hasPermission('supplier:view'))
+  const canCreateSupplier = computed(() => hasPermission('supplier:create'))
+  const canEditSupplier = computed(() => hasPermission('supplier:edit'))
+  const canDeleteSupplier = computed(() => hasPermission('supplier:delete'))
+  const canManageSupplierQualification = computed(() => hasPermission('supplier:qualification:manage'))
+  const canViewSupplierEvaluation = computed(() => hasPermission('supplier:evaluation:view'))
+  const canManageSupplier = computed(() => hasAnyPermission(['supplier:create', 'supplier:edit', 'supplier:delete']))
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -115,5 +123,12 @@ export function usePermission() {
     canManageSystem,
     canViewAuditLogs,
     canExportAuditLogs,
+    canViewSuppliers,
+    canCreateSupplier,
+    canEditSupplier,
+    canDeleteSupplier,
+    canManageSupplierQualification,
+    canViewSupplierEvaluation,
+    canManageSupplier,
   }
 }

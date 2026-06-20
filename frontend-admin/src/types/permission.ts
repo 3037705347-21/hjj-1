@@ -44,6 +44,12 @@ export type PermissionCode =
   | 'purchase:order:receive'
   | 'purchase:order:return'
   | 'purchase:order:complete'
+  | 'supplier:view'
+  | 'supplier:create'
+  | 'supplier:edit'
+  | 'supplier:delete'
+  | 'supplier:qualification:manage'
+  | 'supplier:evaluation:view'
 
 export type DataScope = 'all' | 'lab' | 'department' | 'group' | 'self'
 
@@ -97,6 +103,12 @@ export const permissionLabels: Record<PermissionCode, string> = {
   'purchase:order:receive': '采购到货登记',
   'purchase:order:return': '采购退货',
   'purchase:order:complete': '完成采购单',
+  'supplier:view': '查看供应商',
+  'supplier:create': '新增供应商',
+  'supplier:edit': '编辑供应商',
+  'supplier:delete': '删除供应商',
+  'supplier:qualification:manage': '管理资质附件',
+  'supplier:evaluation:view': '查看供应商评价',
 }
 
 export const dataScopeLabels: Record<DataScope, string> = {
@@ -152,6 +164,12 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'purchase:order:receive',
     'purchase:order:return',
     'purchase:order:complete',
+    'supplier:view',
+    'supplier:create',
+    'supplier:edit',
+    'supplier:delete',
+    'supplier:qualification:manage',
+    'supplier:evaluation:view',
   ],
   lab_manager: [
     'dashboard:view',
@@ -191,6 +209,12 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'purchase:order:receive',
     'purchase:order:return',
     'purchase:order:complete',
+    'supplier:view',
+    'supplier:create',
+    'supplier:edit',
+    'supplier:delete',
+    'supplier:qualification:manage',
+    'supplier:evaluation:view',
   ],
   lab_staff: [
     'dashboard:view',
@@ -206,6 +230,7 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'purchase:request:create',
     'purchase:request:edit',
     'purchase:request:submit',
+    'supplier:view',
   ],
 }
 
