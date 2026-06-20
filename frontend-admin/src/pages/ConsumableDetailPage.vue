@@ -22,6 +22,8 @@ import {
   ChevronRight,
   Edit2,
   Printer,
+  Building2,
+  Star,
 } from 'lucide-vue-next'
 import type {
   Consumable,
@@ -39,6 +41,8 @@ import { formatDate } from '@/utils/date'
 import ConsumableOperationModal from '@/components/ConsumableOperationModal.vue'
 import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
 import type { LabelData } from '@/types/label'
+import { mockGetAllSuppliers } from '@/mock/suppliers'
+import type { Supplier } from '@/types/supplier'
 
 const route = useRoute()
 const router = useRouter()
@@ -151,6 +155,27 @@ const getOperationConfig = (type: ConsumableOperationType) => {
 const showPrintDialog = ref(false)
 const printLabelData = ref<LabelData | null>(null)
 
+const supplierList = ref<Supplier[]>([])
+
+const fetchSuppliers = async () => {
+  try {
+    supplierList.value = await mockGetAllSuppliers()
+  } catch (e) {
+    console.error('Failed to fetch suppliers', e)
+  }
+}
+
+const getSupplierName = (id?: string) => {
+  if (!id) return '-'
+  const s = supplierList.value.find(x => x.id === id)
+  return s ? s.name : '-'
+}
+
+const getSupplierNames = (ids?: string[]) => {
+  if (!ids || ids.length === 0) return []
+  return ids.map(id => getSupplierName(id)).filter(n => n !== '-') as string[]
+}
+
 const openPrintDialog = () => {
   if (!consumable.value) return
   printLabelData.value = {
@@ -169,6 +194,7 @@ const openPrintDialog = () => {
 
 onMounted(() => {
   fetchData()
+  fetchSuppliers()
 })
 </script>
 
@@ -295,6 +321,29 @@ onMounted(() => {
             >
               <div class="text-xs text-blue-600 mb-1">描述说明</div>
               <div class="text-sm text-gray-700">{{ consumable.description }}</div>
+            </div>
+
+            <div class="mt-6 p-4 rounded-xl bg-gray-50">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Building2 class="w-4 h-4 text-primary-600" />关联供应商
+              </h4>
+              <div v-if="getSupplierNames(consumable.supplierIds).length > 0" class="flex flex-wrap gap-2">
+                <span
+                  v-for="name in getSupplierNames(consumable.supplierIds)"
+                  :key="name"
+                  class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm"
+                  :class="[
+                    name === getSupplierName(consumable.defaultSupplierId)
+                      ? 'bg-primary-100 text-primary-700 font-medium'
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  ]"
+                >
+                  <Star v-if="name === getSupplierName(consumable.defaultSupplierId)" class="w-3.5 h-3.5" />
+                  {{ name }}
+                  <span v-if="name === getSupplierName(consumable.defaultSupplierId)" class="text-xs opacity-80">(默认)</span>
+                </span>
+              </div>
+              <div v-else class="text-sm text-gray-400">暂无关联供应商</div>
             </div>
 
             <div class="mt-6 pt-6 border-t border-gray-100">

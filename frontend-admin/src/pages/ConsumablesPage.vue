@@ -26,6 +26,8 @@ import {
   ScanLine,
   Tags,
   MapPin,
+  Building2,
+  Star,
 } from 'lucide-vue-next'
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
@@ -72,6 +74,8 @@ import ScanSearchBox from '@/components/ScanSearchBox.vue'
 import ScanResultCard from '@/components/ScanResultCard.vue'
 import type { LabelData, LabelEntityType } from '@/types/label'
 import { usePermission } from '@/composables/usePermission'
+import { mockGetAllSuppliers } from '@/mock/suppliers'
+import type { Supplier } from '@/types/supplier'
 
 const router = useRouter()
 const permission = usePermission()
@@ -141,6 +145,8 @@ const formData = reactive<ConsumableFormData>({
   manufacturer: '',
   location: '',
   description: '',
+  supplierIds: [],
+  defaultSupplierId: undefined,
 })
 
 const operationModalVisible = ref(false)
@@ -306,6 +312,8 @@ const openCreateModal = () => {
     manufacturer: '',
     location: '',
     description: '',
+    supplierIds: [],
+    defaultSupplierId: undefined,
   })
   showFormModal.value = true
 }
@@ -327,6 +335,8 @@ const openEditModal = async (id: string) => {
         manufacturer: consumable.manufacturer || '',
         location: consumable.location || '',
         description: consumable.description || '',
+        supplierIds: consumable.supplierIds || [],
+        defaultSupplierId: consumable.defaultSupplierId,
       })
       showFormModal.value = true
     }
@@ -564,6 +574,44 @@ const scanEntityType = ref<LabelEntityType | null>(null)
 const scanEntityId = ref<string | null>(null)
 const scannedCode = ref<string | null>(null)
 
+const supplierList = ref<Supplier[]>([])
+
+const fetchSuppliers = async () => {
+  try {
+    supplierList.value = await mockGetAllSuppliers()
+  } catch (e) {
+    console.error('Failed to fetch suppliers', e)
+  }
+}
+
+const activeSuppliers = computed(() => supplierList.value.filter(s => s.status === 'active'))
+
+const getSupplierName = (id?: string) => {
+  if (!id) return '-'
+  const s = supplierList.value.find(x => x.id === id)
+  return s ? s.name : '-'
+}
+
+const getSupplierNames = (ids?: string[]) => {
+  if (!ids || ids.length === 0) return []
+  return ids.map(id => getSupplierName(id)).filter(n => n !== '-') as string[]
+}
+
+const toggleSupplierId = (supplierId: string) => {
+  if (!formData.supplierIds) {
+    formData.supplierIds = []
+  }
+  const idx = formData.supplierIds.indexOf(supplierId)
+  if (idx > -1) {
+    formData.supplierIds.splice(idx, 1)
+    if (formData.defaultSupplierId === supplierId) {
+      formData.defaultSupplierId = undefined
+    }
+  } else {
+    formData.supplierIds.push(supplierId)
+  }
+}
+
 const openPrintDialog = (consumable: Consumable) => {
   printLabelData.value = {
     entityType: 'consumable',
@@ -592,6 +640,7 @@ const handleScan = (payload: { entityType: LabelEntityType | null; entityId: str
 
 onMounted(() => {
   fetchData()
+  fetchSuppliers()
 })
 </script>
 
@@ -715,6 +764,9 @@ onMounted(() => {
                   <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     生产厂家
                   </th>
+                  <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    供应商
+                  </th>
                   <th class="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     操作
                   </th>
@@ -814,6 +866,24 @@ onMounted(() => {
                   </td>
                   <td class="px-6 py-4 text-sm text-gray-600" @click.stop>
                     {{ item.manufacturer || '-' }}
+                  </td>
+                  <td class="px-6 py-4" @click.stop>
+                    <div v-if="getSupplierNames(item.supplierIds).length > 0" class="flex flex-wrap gap-1">
+                      <span
+                        v-for="name in getSupplierNames(item.supplierIds)"
+                        :key="name"
+                        class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs"
+                        :class="[
+                          name === getSupplierName(item.defaultSupplierId)
+                            ? 'bg-primary-100 text-primary-700 font-medium'
+                            : 'bg-gray-100 text-gray-600'
+                        ]"
+                      >
+                        <Star v-if="name === getSupplierName(item.defaultSupplierId)" class="w-3 h-3" />
+                        {{ name }}
+                      </span>
+                    </div>
+                    <span v-else class="text-gray-400 text-sm">-</span>
                   </td>
                   <td class="px-6 py-4" @click.stop>
                     <div class="flex items-center justify-center gap-1">
@@ -1253,6 +1323,55 @@ onMounted(() => {
                 class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all resize-none"
                 placeholder="请输入耗材描述"
               />
+            </div>
+
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Building2 class="w-4 h-4 text-primary-600" />供应商信息
+              </h4>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">关联供应商</label>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-white border border-gray-200 rounded-lg">
+                    <div v-if="activeSuppliers.length === 0" class="col-span-2 text-sm text-gray-400 py-2 text-center">
+                      暂无可用供应商
+                    </div>
+                    <label
+                      v-for="s in activeSuppliers"
+                      :key="s.id"
+                      class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="formData.supplierIds?.includes(s.id)"
+                        class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        @change="toggleSupplierId(s.id)"
+                      >
+                      <span class="text-sm text-gray-700 flex-1">{{ s.name }}</span>
+                      <span v-if="formData.defaultSupplierId === s.id" class="text-xs text-primary-600 font-medium inline-flex items-center gap-0.5">
+                        <Star class="w-3 h-3" />默认
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1.5">默认供应商</label>
+                  <select
+                    v-model="formData.defaultSupplierId"
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
+                  >
+                    <option value="">请选择默认供应商</option>
+                    <option
+                      v-for="s in activeSuppliers.filter(x => formData.supplierIds?.includes(x.id))"
+                      :key="s.id"
+                      :value="s.id"
+                    >
+                      {{ s.name }}
+                    </option>
+                  </select>
+                  <p class="text-xs text-gray-400 mt-1">需先在上方勾选关联供应商后才能设为默认</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

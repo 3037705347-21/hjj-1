@@ -24,6 +24,8 @@ import {
   Tags,
   Thermometer,
   Power,
+  Building2,
+  Star,
 } from 'lucide-vue-next'
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
@@ -68,6 +70,8 @@ import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
 import ScanSearchBox from '@/components/ScanSearchBox.vue'
 import ScanResultCard from '@/components/ScanResultCard.vue'
 import type { LabelData, LabelEntityType } from '@/types/label'
+import { mockGetAllSuppliers } from '@/mock/suppliers'
+import type { Supplier } from '@/types/supplier'
 
 const router = useRouter()
 const loading = ref(false)
@@ -141,6 +145,44 @@ const scanEntityType = ref<LabelEntityType | null>(null)
 const scanEntityId = ref<string | null>(null)
 const scannedCode = ref<string | null>(null)
 
+const supplierList = ref<Supplier[]>([])
+
+const fetchSuppliers = async () => {
+  try {
+    supplierList.value = await mockGetAllSuppliers()
+  } catch (e) {
+    console.error('Failed to fetch suppliers', e)
+  }
+}
+
+const activeSuppliers = computed(() => supplierList.value.filter(s => s.status === 'active'))
+
+const getSupplierName = (id?: string) => {
+  if (!id) return '-'
+  const s = supplierList.value.find(x => x.id === id)
+  return s ? s.name : '-'
+}
+
+const getSupplierNames = (ids?: string[]) => {
+  if (!ids || ids.length === 0) return []
+  return ids.map(id => getSupplierName(id)).filter(n => n !== '-') as string[]
+}
+
+const toggleSupplierId = (supplierId: string) => {
+  if (!formData.supplierIds) {
+    formData.supplierIds = []
+  }
+  const idx = formData.supplierIds.indexOf(supplierId)
+  if (idx > -1) {
+    formData.supplierIds.splice(idx, 1)
+    if (formData.defaultSupplierId === supplierId) {
+      formData.defaultSupplierId = undefined
+    }
+  } else {
+    formData.supplierIds.push(supplierId)
+  }
+}
+
 const batchActions = computed(() => [
   { key: 'category', label: '批量修改分类', icon: Tags, type: 'default' as const, permission: permission.canEditReagent.value },
   { key: 'storage', label: '批量修改储存条件', icon: Thermometer, type: 'default' as const, permission: permission.canEditReagent.value },
@@ -172,6 +214,8 @@ const defaultFormData = (): ReagentFormData => ({
   storageCondition: '',
   description: '',
   hazardLevel: 'low',
+  supplierIds: [],
+  defaultSupplierId: undefined,
 })
 
 const formData = reactive<ReagentFormData>(defaultFormData())
@@ -280,6 +324,8 @@ const openEditModal = async (id: string) => {
         storageCondition: reagent.storageCondition,
         description: reagent.description || '',
         hazardLevel: reagent.hazardLevel || 'low',
+        supplierIds: reagent.supplierIds || [],
+        defaultSupplierId: reagent.defaultSupplierId,
       })
       showFormModal.value = true
     }
@@ -607,6 +653,7 @@ const getEnabledColor = (enabled: boolean) => enabledStatusColors[String(enabled
 
 onMounted(() => {
   fetchData()
+  fetchSuppliers()
 })
 </script>
 
@@ -679,6 +726,7 @@ onMounted(() => {
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">品牌/货号</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">储存条件</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">危害等级</th>
+                <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">供应商</th>
                 <th class="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">状态</th>
                 <th class="px-6 py-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
               </tr>
@@ -727,6 +775,24 @@ onMounted(() => {
                   >
                     {{ hazardLevelLabels[reagent.hazardLevel] }}
                   </span>
+                  <span v-else class="text-gray-400 text-sm">-</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div v-if="getSupplierNames(reagent.supplierIds).length > 0" class="flex flex-wrap gap-1">
+                    <span
+                      v-for="name in getSupplierNames(reagent.supplierIds)"
+                      :key="name"
+                      class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs"
+                      :class="[
+                        name === getSupplierName(reagent.defaultSupplierId)
+                          ? 'bg-primary-100 text-primary-700 font-medium'
+                          : 'bg-gray-100 text-gray-600'
+                      ]"
+                    >
+                      <Star v-if="name === getSupplierName(reagent.defaultSupplierId)" class="w-3 h-3" />
+                      {{ name }}
+                    </span>
+                  </div>
                   <span v-else class="text-gray-400 text-sm">-</span>
                 </td>
                 <td class="px-6 py-4">
@@ -1147,6 +1213,55 @@ onMounted(() => {
 
             <div class="bg-gray-50 rounded-lg p-4">
               <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Building2 class="w-4 h-4 text-primary-600" />供应商信息
+              </h4>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-2">关联供应商</label>
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-2 bg-white border border-gray-200 rounded-lg">
+                    <div v-if="activeSuppliers.length === 0" class="col-span-2 text-sm text-gray-400 py-2 text-center">
+                      暂无可用供应商
+                    </div>
+                    <label
+                      v-for="s in activeSuppliers"
+                      :key="s.id"
+                      class="flex items-center gap-2 p-2 rounded hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="formData.supplierIds?.includes(s.id)"
+                        class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                        @change="toggleSupplierId(s.id)"
+                      >
+                      <span class="text-sm text-gray-700 flex-1">{{ s.name }}</span>
+                      <span v-if="formData.defaultSupplierId === s.id" class="text-xs text-primary-600 font-medium inline-flex items-center gap-0.5">
+                        <Star class="w-3 h-3" />默认
+                      </span>
+                    </label>
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1.5">默认供应商</label>
+                  <select
+                    v-model="formData.defaultSupplierId"
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all bg-white"
+                  >
+                    <option value="">请选择默认供应商</option>
+                    <option
+                      v-for="s in activeSuppliers.filter(x => formData.supplierIds?.includes(x.id))"
+                      :key="s.id"
+                      :value="s.id"
+                    >
+                      {{ s.name }}
+                    </option>
+                  </select>
+                  <p class="text-xs text-gray-400 mt-1">需先在上方勾选关联供应商后才能设为默认</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="bg-gray-50 rounded-lg p-4">
+              <h4 class="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
                 <ToggleRight class="w-4 h-4 text-primary-600" />其他信息
               </h4>
               <div class="space-y-4">
@@ -1281,6 +1396,25 @@ onMounted(() => {
                     <div class="flex gap-2 md:col-span-2">
                       <span class="text-sm text-gray-500 w-24 flex-shrink-0">别名</span>
                       <span class="text-sm text-gray-800">{{ detailData.aliases || '-' }}</span>
+                    </div>
+                    <div class="flex gap-2 md:col-span-2">
+                      <span class="text-sm text-gray-500 w-24 flex-shrink-0">关联供应商</span>
+                      <div v-if="getSupplierNames(detailData.supplierIds).length > 0" class="flex flex-wrap gap-1">
+                        <span
+                          v-for="name in getSupplierNames(detailData.supplierIds)"
+                          :key="name"
+                          class="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full text-xs"
+                          :class="[
+                            name === getSupplierName(detailData.defaultSupplierId)
+                              ? 'bg-primary-100 text-primary-700 font-medium'
+                              : 'bg-gray-100 text-gray-600'
+                          ]"
+                        >
+                          <Star v-if="name === getSupplierName(detailData.defaultSupplierId)" class="w-3 h-3" />
+                          {{ name }}
+                        </span>
+                      </div>
+                      <span v-else class="text-sm text-gray-400">暂无</span>
                     </div>
                   </div>
                 </div>
