@@ -8,7 +8,7 @@ import type {
   SupplierDeliveryRecord,
   SupplierExceptionRecord,
 } from '@/types/supplier'
-import type { PurchaseOrder } from '@/types/purchase'
+import type { PurchaseOrder, PurchaseReceiveRecord, PurchaseReturnRecord } from '@/types/purchase'
 import type { PageResult } from '@/types/common'
 import { generateId } from '@/utils/date'
 import { addAuditLog } from './audit'
@@ -16,6 +16,8 @@ import type { User } from '@/types/user'
 import { storage } from '@/utils/storage'
 
 const PURCHASE_ORDER_STORAGE_KEY = 'mock_purchase_orders'
+const PURCHASE_RECEIVE_STORAGE_KEY = 'mock_purchase_receives'
+const PURCHASE_RETURN_STORAGE_KEY = 'mock_purchase_returns'
 
 const STORAGE_KEY = 'mock_suppliers'
 const QUALIFICATION_STORAGE_KEY = 'mock_supplier_qualifications'
@@ -119,6 +121,30 @@ function getPurchaseOrdersFromStorage(): PurchaseOrder[] {
   return []
 }
 
+function getPurchaseReceiveRecordsFromStorage(): PurchaseReceiveRecord[] {
+  const data = localStorage.getItem(PURCHASE_RECEIVE_STORAGE_KEY)
+  if (data) {
+    try {
+      return JSON.parse(data)
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
+function getPurchaseReturnRecordsFromStorage(): PurchaseReturnRecord[] {
+  const data = localStorage.getItem(PURCHASE_RETURN_STORAGE_KEY)
+  if (data) {
+    try {
+      return JSON.parse(data)
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 function getSupplierPurchaseOrders(supplierId: string): PurchaseOrder[] {
   const allOrders = getPurchaseOrdersFromStorage()
   return allOrders.filter(o => o.supplierId === supplierId)
@@ -177,25 +203,6 @@ function generatePriceHistoryFromOrders(supplierId: string, orders: PurchaseOrde
       }
     })
   })
-  if (history.length === 0) {
-    orders.forEach(order => {
-      order.items.forEach(item => {
-        const mockPrice = item.itemType === 'reagent' ? 200 + Math.random() * 800 : 10 + Math.random() * 100
-        history.push({
-          id: `price_${order.id}_${item.itemId}`,
-          supplierId,
-          itemType: item.itemType,
-          itemId: item.itemId,
-          itemName: item.itemName,
-          specification: item.specification,
-          unit: item.unit,
-          unitPrice: Math.round(mockPrice * 100) / 100,
-          quoteDate: order.orderDate || order.createdAt,
-          validFrom: order.orderDate || order.createdAt,
-        })
-      })
-    })
-  }
   return history.sort((a, b) => new Date(b.quoteDate).getTime() - new Date(a.quoteDate).getTime())
 }
 
@@ -207,15 +214,31 @@ function calculateSupplierStats(supplierId: string, orders: PurchaseOrder[]): { 
   const onTimeCount = deliveryRecords.filter(r => r.isOnTime).length
   const onTimeDeliveryRate = deliveryRecords.length > 0
     ? Math.round((onTimeCount / deliveryRecords.length) * 1000) / 10
-    : 95.0
+    : 100.0
 
-  const qualityPassRate = 95 + Math.random() * 4
+  const orderIds = orders.map(o => o.id)
+  const allReceiveRecords = getPurchaseReceiveRecordsFromStorage()
+  const supplierReceiveRecords = allReceiveRecords.filter(r => orderIds.includes(r.orderId))
+
+  const allReturnRecords = getPurchaseReturnRecordsFromStorage()
+  const supplierReturnRecords = allReturnRecords.filter(r => orderIds.includes(r.orderId))
+
+  const totalReceived = supplierReceiveRecords.reduce((sum, r) => sum + r.receivedQuantity, 0)
+  const totalReturned = supplierReturnRecords.reduce((sum, r) => sum + r.returnedQuantity, 0)
+  const totalFailed = supplierReceiveRecords
+    .filter(r => r.stockInStatus === 'failed')
+    .reduce((sum, r) => sum + r.receivedQuantity, 0)
+
+  const qualified = totalReceived > 0 ? Math.max(0, totalReceived - totalReturned - totalFailed) : 0
+  const qualityPassRate = totalReceived > 0
+    ? Math.round((qualified / totalReceived) * 1000) / 10
+    : 100.0
 
   return {
     totalOrders,
     totalAmount,
     onTimeDeliveryRate,
-    qualityPassRate: Math.round(qualityPassRate * 10) / 10,
+    qualityPassRate,
   }
 }
 

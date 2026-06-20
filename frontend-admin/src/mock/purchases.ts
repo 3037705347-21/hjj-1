@@ -126,6 +126,7 @@ function createPurchaseItem(
   specification: string,
   unit: string,
   quantity: number,
+  unitPrice: number,
   manufacturer?: string,
   brand?: string,
   casNo?: string,
@@ -139,6 +140,8 @@ function createPurchaseItem(
     specification,
     unit,
     quantity,
+    unitPrice,
+    totalPrice: Math.round(quantity * unitPrice * 100) / 100,
     manufacturer,
     brand,
     casNo,
@@ -153,10 +156,10 @@ function initMockRequests(): PurchaseRequest[] {
   const requests: PurchaseRequest[] = []
 
   const mockItems: PurchaseItem[] = [
-    createPurchaseItem('reagent', 'reagent_001', '胰蛋白酶', '100mg', '瓶', 10, 'Sigma-Aldrich', 'Sigma', '9002-07-7', '酶'),
-    createPurchaseItem('reagent', 'reagent_002', 'PBS缓冲液', '500ml', '瓶', 20, 'Thermo Fisher', 'Gibco', undefined, '缓冲液'),
-    createPurchaseItem('consumable', 'consumable_001', '离心管', '15ml', '包', 50, 'Axygen', 'Axygen', undefined, '离心管'),
-    createPurchaseItem('consumable', 'consumable_002', '枪头', '200ul', '盒', 100, 'Eppendorf', 'Eppendorf', undefined, '吸头'),
+    createPurchaseItem('reagent', 'reagent_001', '胰蛋白酶', '100mg', '瓶', 10, 285.00, 'Sigma-Aldrich', 'Sigma', '9002-07-7', '酶'),
+    createPurchaseItem('reagent', 'reagent_002', 'PBS缓冲液', '500ml', '瓶', 20, 85.50, 'Thermo Fisher', 'Gibco', undefined, '缓冲液'),
+    createPurchaseItem('consumable', 'consumable_001', '离心管', '15ml', '包', 50, 45.00, 'Axygen', 'Axygen', undefined, '离心管'),
+    createPurchaseItem('consumable', 'consumable_002', '枪头', '200ul', '盒', 100, 68.00, 'Eppendorf', 'Eppendorf', undefined, '吸头'),
   ]
 
   const mockData: Array<{
@@ -208,7 +211,7 @@ function initMockRequests(): PurchaseRequest[] {
       title: 'PCR实验试剂采购',
       itemType: 'reagent',
       items: [
-        createPurchaseItem('reagent', 'reagent_003', 'Taq DNA聚合酶', '500U', '支', 5, 'Thermo Fisher', 'Invitrogen', '9012-90-2', '酶'),
+        createPurchaseItem('reagent', 'reagent_003', 'Taq DNA聚合酶', '500U', '支', 5, 320.00, 'Thermo Fisher', 'Invitrogen', '9012-90-2', '酶'),
       ],
       status: 'approved',
       expectedDeliveryDate: formatDate(new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000)),
@@ -228,7 +231,7 @@ function initMockRequests(): PurchaseRequest[] {
       title: '抗体试剂采购申请',
       itemType: 'reagent',
       items: [
-        createPurchaseItem('reagent', 'reagent_004', 'GAPDH抗体', '100ul', '支', 2, 'Abcam', 'Abcam', undefined, '抗体'),
+        createPurchaseItem('reagent', 'reagent_004', 'GAPDH抗体', '100ul', '支', 2, 1680.00, 'Abcam', 'Abcam', undefined, '抗体'),
       ],
       status: 'purchasing',
       expectedDeliveryDate: formatDate(new Date(now.getTime() + 2 * 24 * 60 * 60 * 1000)),
@@ -248,7 +251,7 @@ function initMockRequests(): PurchaseRequest[] {
       title: '培养基采购申请',
       itemType: 'reagent',
       items: [
-        createPurchaseItem('reagent', 'reagent_005', 'DMEM培养基', '500ml', '瓶', 15, 'Thermo Fisher', 'Gibco', undefined, '培养基'),
+        createPurchaseItem('reagent', 'reagent_005', 'DMEM培养基', '500ml', '瓶', 15, 125.00, 'Thermo Fisher', 'Gibco', undefined, '培养基'),
       ],
       status: 'partial_received',
       expectedDeliveryDate: formatDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000)),
@@ -268,7 +271,7 @@ function initMockRequests(): PurchaseRequest[] {
       title: '移液器枪头采购',
       itemType: 'consumable',
       items: [
-        createPurchaseItem('consumable', 'consumable_003', '枪头', '1000ul', '盒', 30, 'Eppendorf', 'Eppendorf', undefined, '吸头'),
+        createPurchaseItem('consumable', 'consumable_003', '枪头', '1000ul', '盒', 30, 72.00, 'Eppendorf', 'Eppendorf', undefined, '吸头'),
       ],
       status: 'completed',
       expectedDeliveryDate: formatDate(new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000)),
@@ -288,7 +291,7 @@ function initMockRequests(): PurchaseRequest[] {
       title: '有机试剂采购申请',
       itemType: 'reagent',
       items: [
-        createPurchaseItem('reagent', 'reagent_006', '无水乙醇', '500ml', '瓶', 20, '国药集团', '国药', '64-17-5', '有机溶剂'),
+        createPurchaseItem('reagent', 'reagent_006', '无水乙醇', '500ml', '瓶', 20, 28.50, '国药集团', '国药', '64-17-5', '有机溶剂'),
       ],
       status: 'rejected',
       expectedDeliveryDate: formatDate(new Date(now.getTime() + 10 * 24 * 60 * 60 * 1000)),
@@ -309,6 +312,7 @@ function initMockRequests(): PurchaseRequest[] {
     const createdAt = new Date(now.getTime() - item.daysAgo * 24 * 60 * 60 * 1000)
     const items = item.items.map(i => ({ ...i, id: generateId() }))
     const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
+    const totalAmount = items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
 
     requests.push({
       id: generateId(),
@@ -321,6 +325,7 @@ function initMockRequests(): PurchaseRequest[] {
       itemType: item.itemType,
       items,
       totalQuantity,
+      totalAmount,
       expectedDeliveryDate: item.expectedDeliveryDate,
       purpose: item.purpose,
       reason: item.reason,
@@ -405,6 +410,7 @@ function initMockOrders(): PurchaseOrder[] {
       returnedQuantity: 0,
     }))
     const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
+    const totalAmount = items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
 
     orders.push({
       id: item.request.purchaseOrderId || generateId(),
@@ -420,6 +426,7 @@ function initMockOrders(): PurchaseOrder[] {
       itemType: item.request.itemType,
       items,
       totalQuantity,
+      totalAmount,
       expectedDeliveryDate: item.request.expectedDeliveryDate,
       actualDeliveryDate: item.actualDeliveryDate,
       orderDate: item.orderDate,
@@ -431,6 +438,79 @@ function initMockOrders(): PurchaseOrder[] {
   })
 
   saveOrdersToStorage(orders)
+
+  const receiveRecords: PurchaseReceiveRecord[] = []
+  const returnRecords: PurchaseReturnRecord[] = []
+  const now = formatDate(new Date())
+
+  orders.forEach(order => {
+    if (order.status === 'partial_received' || order.status === 'fully_received' || order.status === 'completed') {
+      order.items.forEach(item => {
+        if (item.receivedQuantity > 0) {
+          const failRate = order.supplierId === 'sup_002' ? 0.15 : 0.02
+          const returnRate = order.supplierId === 'sup_002' ? 0.1 : 0.01
+
+          let remainingReceived = item.receivedQuantity
+          let batchNum = 0
+
+          while (remainingReceived > 0) {
+            batchNum++
+            const batchQuantity = Math.min(remainingReceived, Math.ceil(item.quantity / 2))
+            remainingReceived -= batchQuantity
+
+            const random = Math.random()
+            let stockInStatus: 'pending' | 'completed' | 'failed' = 'completed'
+            if (random < failRate) {
+              stockInStatus = 'failed'
+            } else if (random < failRate + 0.05) {
+              stockInStatus = 'pending'
+            }
+
+            receiveRecords.push({
+              id: generateId(),
+              orderId: order.id,
+              itemId: item.id,
+              itemName: item.itemName,
+              receivedQuantity: batchQuantity,
+              unit: item.unit,
+              receivedDate: order.actualDeliveryDate || order.updatedAt,
+              receiverId: 'user_manager_1',
+              receiverName: '张主任',
+              batchNumber: order.itemType === 'reagent' ? `B${new Date(order.createdAt).getTime().toString().slice(-6)}${batchNum}` : undefined,
+              productionDate: order.itemType === 'reagent' ? formatDate(new Date(new Date(order.createdAt).getTime() - 30 * 24 * 60 * 60 * 1000)) : undefined,
+              expiryDate: order.itemType === 'reagent' ? formatDate(new Date(new Date(order.createdAt).getTime() + 365 * 24 * 60 * 60 * 1000)) : undefined,
+              storageLocation: '冷藏柜A-01',
+              remark: stockInStatus === 'failed' ? '质量不合格，拒收' : (stockInStatus === 'pending' ? '待检验' : '入库验收通过'),
+              stockInStatus,
+              createdAt: order.actualDeliveryDate || now,
+            })
+
+            if (stockInStatus === 'completed' && Math.random() < returnRate && batchQuantity > 2) {
+              const returnQty = Math.max(1, Math.floor(batchQuantity * 0.2))
+              returnRecords.push({
+                id: generateId(),
+                orderId: order.id,
+                itemId: item.id,
+                itemName: item.itemName,
+                returnedQuantity: returnQty,
+                unit: item.unit,
+                returnedDate: formatDate(new Date(new Date(order.actualDeliveryDate || order.updatedAt).getTime() + 1 * 24 * 60 * 60 * 1000)),
+                returnerId: 'user_lab_1',
+                returnerName: '李研究员',
+                reason: '使用中发现部分产品质量异常',
+                remark: '退回供应商',
+                createdAt: now,
+              })
+            }
+          }
+        }
+      })
+    }
+  })
+
+  saveReceiveRecordsToStorage(receiveRecords)
+  saveReturnRecordsToStorage(returnRecords)
+
   return orders
 }
 
@@ -518,6 +598,7 @@ export async function mockCreatePurchaseRequest(
         returnedQuantity: 0,
       }))
       const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
+      const totalAmount = items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
 
       const newRequest: PurchaseRequest = {
         id: generateId(),
@@ -530,6 +611,7 @@ export async function mockCreatePurchaseRequest(
         itemType: data.itemType,
         items,
         totalQuantity,
+        totalAmount,
         expectedDeliveryDate: data.expectedDeliveryDate,
         purpose: data.purpose,
         reason: data.reason,
@@ -590,6 +672,7 @@ export async function mockUpdatePurchaseRequest(
         itemType: data.itemType || request.itemType,
         items,
         totalQuantity: items.reduce((sum, i) => sum + i.quantity, 0),
+        totalAmount: items.reduce((sum, i) => sum + (i.totalPrice || 0), 0),
         expectedDeliveryDate: data.expectedDeliveryDate ?? request.expectedDeliveryDate,
         purpose: data.purpose ?? request.purpose,
         reason: data.reason ?? request.reason,
@@ -702,6 +785,7 @@ export async function mockApprovePurchaseRequest(
         returnedQuantity: 0,
       }))
       const totalQuantity = orderItems.reduce((sum, i) => sum + i.quantity, 0)
+      const totalAmount = orderItems.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
 
       const newOrder: PurchaseOrder = {
         id: generateId(),
@@ -717,6 +801,7 @@ export async function mockApprovePurchaseRequest(
         itemType: request.itemType,
         items: orderItems,
         totalQuantity,
+        totalAmount,
         expectedDeliveryDate: request.expectedDeliveryDate,
         orderDate: now,
         remark: remark || '审批通过自动生成',
@@ -886,6 +971,7 @@ export async function mockCreatePurchaseOrder(
         returnedQuantity: 0,
       }))
       const totalQuantity = items.reduce((sum, i) => sum + i.quantity, 0)
+      const totalAmount = items.reduce((sum, i) => sum + (i.totalPrice || 0), 0)
 
       const newOrder: PurchaseOrder = {
         id: generateId(),
@@ -901,6 +987,7 @@ export async function mockCreatePurchaseOrder(
         itemType: request.itemType,
         items,
         totalQuantity,
+        totalAmount,
         expectedDeliveryDate: data.expectedDeliveryDate || request.expectedDeliveryDate,
         orderDate: data.orderDate || now,
         remark: data.remark,
