@@ -102,7 +102,7 @@ function getExceptionRecordsFromStorage(): SupplierExceptionRecord[] {
       return []
     }
   }
-  return []
+  return initMockExceptionRecords()
 }
 
 function saveExceptionRecordsToStorage(records: SupplierExceptionRecord[]): void {
@@ -223,16 +223,32 @@ function calculateSupplierStats(supplierId: string, orders: PurchaseOrder[]): { 
   const allReturnRecords = getPurchaseReturnRecordsFromStorage()
   const supplierReturnRecords = allReturnRecords.filter(r => orderIds.includes(r.orderId))
 
+  const allExceptionRecords = getExceptionRecordsFromStorage()
+  const qualityExceptions = allExceptionRecords.filter(
+    e => e.supplierId === supplierId && e.type === 'quality'
+  )
+
   const totalReceived = supplierReceiveRecords.reduce((sum, r) => sum + r.receivedQuantity, 0)
   const totalReturned = supplierReturnRecords.reduce((sum, r) => sum + r.returnedQuantity, 0)
   const totalFailed = supplierReceiveRecords
     .filter(r => r.stockInStatus === 'failed')
     .reduce((sum, r) => sum + r.receivedQuantity, 0)
 
+  const exceptionDeductQty = qualityExceptions
+    .filter(e => e.status !== 'resolved' && e.status !== 'closed')
+    .length
+
   const qualified = totalReceived > 0 ? Math.max(0, totalReceived - totalReturned - totalFailed) : 0
-  const qualityPassRate = totalReceived > 0
+  let qualityPassRate = totalReceived > 0
     ? Math.round((qualified / totalReceived) * 1000) / 10
     : 100.0
+
+  if (totalReceived > 0 && exceptionDeductQty > 0) {
+    const deduction = Math.min(exceptionDeductQty * 1.5, qualityPassRate - 50)
+    if (deduction > 0) {
+      qualityPassRate = Math.round((qualityPassRate - deduction) * 10) / 10
+    }
+  }
 
   return {
     totalOrders,
@@ -384,9 +400,6 @@ function initMockSuppliers(): Supplier[] {
 
   saveSuppliersToStorage(suppliers)
   initMockQualifications()
-  initMockPriceHistory()
-  initMockDeliveryRecords()
-  initMockExceptionRecords()
 
   return suppliers
 }
@@ -453,38 +466,14 @@ function initMockQualifications(): SupplierQualification[] {
 }
 
 function initMockPriceHistory(): SupplierPriceHistory[] {
+  const orders = getPurchaseOrdersFromStorage()
+  const allSuppliers = getSuppliersFromStorage()
   const history: SupplierPriceHistory[] = []
-  const today = new Date()
 
-  const priceData = [
-    { supplierId: 'sup_001', itemName: 'PBS缓冲液', specification: '500mL/瓶', unit: '瓶', basePrice: 45 },
-    { supplierId: 'sup_001', itemName: 'Trizol试剂', specification: '100mL/瓶', unit: '瓶', basePrice: 380 },
-    { supplierId: 'sup_001', itemName: 'PCR 8联管', specification: '125条/包', unit: '包', basePrice: 85 },
-    { supplierId: 'sup_002', itemName: '移液枪 1000μL', specification: '单道', unit: '把', basePrice: 1200 },
-    { supplierId: 'sup_003', itemName: '一次性手套 M号', specification: '100只/盒', unit: '盒', basePrice: 28 },
-  ]
-
-  priceData.forEach((item, idx) => {
-    for (let i = 11; i >= 0; i--) {
-      const quoteDate = new Date(today)
-      quoteDate.setMonth(quoteDate.getMonth() - i)
-      const priceVariation = (Math.random() - 0.5) * 0.15 * item.basePrice
-      const unitPrice = parseFloat((item.basePrice + priceVariation).toFixed(2))
-
-      history.push({
-        id: `price_${idx}_${i}`,
-        supplierId: item.supplierId,
-        itemType: idx < 3 ? 'reagent' : 'consumable',
-        itemId: `item_${idx}_${i}`,
-        itemName: item.itemName,
-        specification: item.specification,
-        unit: item.unit,
-        unitPrice,
-        quoteDate: quoteDate.toISOString().split('T')[0],
-        validFrom: quoteDate.toISOString().split('T')[0],
-        remark: i === 0 ? '当前报价' : `第${12 - i}次报价`,
-      })
-    }
+  allSuppliers.forEach(supplier => {
+    const supplierOrders = orders.filter(o => o.supplierId === supplier.id)
+    const supplierHistory = generatePriceHistoryFromOrders(supplier.id, supplierOrders)
+    history.push(...supplierHistory)
   })
 
   savePriceHistoryToStorage(history)
@@ -492,47 +481,15 @@ function initMockPriceHistory(): SupplierPriceHistory[] {
 }
 
 function initMockDeliveryRecords(): SupplierDeliveryRecord[] {
+  const orders = getPurchaseOrdersFromStorage()
+  const allSuppliers = getSuppliersFromStorage()
   const records: SupplierDeliveryRecord[] = []
-  const today = new Date()
 
-  for (let i = 0; i < 20; i++) {
-    const supplierIdx = i % 3
-    const supplierIds = ['sup_001', 'sup_002', 'sup_003']
-    const supplierId = supplierIds[supplierIdx]
-
-    const expectedDate = new Date(today)
-    expectedDate.setDate(expectedDate.getDate() - i * 7 - Math.floor(Math.random() * 3))
-
-    const actualDate = new Date(expectedDate)
-    const delayDays = Math.floor(Math.random() * 5) - 1
-    actualDate.setDate(actualDate.getDate() + Math.max(0, delayDays))
-
-    records.push({
-      id: `delivery_${i + 1}`,
-      supplierId,
-      orderId: `order_${i + 1}`,
-      orderNo: `PO${String(2024001 + i).padStart(8, '0')}`,
-      expectedDate: expectedDate.toISOString().split('T')[0],
-      actualDate: actualDate.toISOString().split('T')[0],
-      isOnTime: delayDays <= 0,
-      delayDays: delayDays > 0 ? delayDays : 0,
-      items: [
-        {
-          itemId: `item_${i}_1`,
-          itemName: `产品${i + 1}-A`,
-          quantity: 10 + Math.floor(Math.random() * 40),
-          receivedQuantity: 10 + Math.floor(Math.random() * 40),
-        },
-        {
-          itemId: `item_${i}_2`,
-          itemName: `产品${i + 1}-B`,
-          quantity: 5 + Math.floor(Math.random() * 20),
-          receivedQuantity: 5 + Math.floor(Math.random() * 20),
-        },
-      ],
-      remark: delayDays > 2 ? '物流延误' : '',
-    })
-  }
+  allSuppliers.forEach(supplier => {
+    const supplierOrders = orders.filter(o => o.supplierId === supplier.id)
+    const supplierRecords = generateDeliveryRecordsFromOrders(supplier.id, supplierOrders)
+    records.push(...supplierRecords)
+  })
 
   saveDeliveryRecordsToStorage(records)
   return records
@@ -544,56 +501,42 @@ function initMockExceptionRecords(): SupplierExceptionRecord[] {
   const defaultHandler = user?.id || '2'
   const defaultHandlerName = user?.name || '李主任'
 
-  const records: SupplierExceptionRecord[] = [
-    {
+  const orders = getPurchaseOrdersFromStorage()
+  const sup001Orders = orders.filter(o => o.supplierId === 'sup_001')
+  const sup002Orders = orders.filter(o => o.supplierId === 'sup_002')
+
+  const records: SupplierExceptionRecord[] = []
+
+  if (sup001Orders.length > 0) {
+    const order = sup001Orders.find(o => o.status === 'partial_received') || sup001Orders[0]
+    records.push({
       id: 'except_001',
       supplierId: 'sup_001',
       type: 'quality',
       title: '试剂纯度不达标',
-      description: '收到的Trizol试剂纯度检测不合格，A260/A280比值偏低',
-      orderId: 'order_5',
-      orderNo: 'PO2024006',
+      description: '收到的DMEM培养基纯度检测不合格，pH值偏移超出允许范围，部分批次出现沉淀',
+      orderId: order.id,
+      orderNo: order.orderNo,
       status: 'resolved',
       level: 'high',
       handler: defaultHandler,
       handlerName: defaultHandlerName,
       createdAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
       resolvedAt: new Date(Date.now() - 25 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: '已更换批次并退款处理',
-    },
-    {
-      id: 'except_002',
-      supplierId: 'sup_002',
-      type: 'delivery',
-      title: '延期交货',
-      description: '移液枪订单延期5天交付，影响实验进度',
-      orderId: 'order_8',
-      orderNo: 'PO2024009',
-      status: 'processing',
-      level: 'medium',
-      handler: defaultHandler,
-      handlerName: defaultHandlerName,
-      createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: '',
-    },
-    {
-      id: 'except_003',
-      supplierId: 'sup_003',
-      type: 'service',
-      title: '售后服务响应慢',
-      description: '手套质量问题反馈后3天才回复',
-      status: 'pending',
-      level: 'low',
-      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-    },
-    {
+      resolution: '已更换批次并退款处理，供应商补发合格品',
+    })
+  }
+
+  if (sup001Orders.length > 1) {
+    const order = sup001Orders.find(o => o.status === 'purchasing') || sup001Orders[1]
+    records.push({
       id: 'except_004',
       supplierId: 'sup_001',
       type: 'price',
       title: '价格突然上涨',
-      description: 'PBS缓冲液价格上涨20%，未提前通知',
-      orderId: 'order_3',
-      orderNo: 'PO2024004',
+      description: 'PBS缓冲液价格上涨20%，未提前通知，影响预算计划',
+      orderId: order.id,
+      orderNo: order.orderNo,
       status: 'resolved',
       level: 'medium',
       handler: defaultHandler,
@@ -601,8 +544,51 @@ function initMockExceptionRecords(): SupplierExceptionRecord[] {
       createdAt: new Date(Date.now() - 45 * 24 * 60 * 60 * 1000).toISOString(),
       resolvedAt: new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString(),
       resolution: '已协商恢复原价，提供补偿折扣',
-    },
-  ]
+    })
+  }
+
+  if (sup002Orders.length > 0) {
+    const order = sup002Orders.find(o => o.status === 'completed') || sup002Orders[0]
+    records.push({
+      id: 'except_002',
+      supplierId: 'sup_002',
+      type: 'delivery',
+      title: '延期交货',
+      description: '移液器枪头订单延期5天交付，影响实验进度，部分产品外包装破损',
+      orderId: order.id,
+      orderNo: order.orderNo,
+      status: 'processing',
+      level: 'medium',
+      handler: defaultHandler,
+      handlerName: defaultHandlerName,
+      createdAt: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    records.push({
+      id: 'except_005',
+      supplierId: 'sup_002',
+      type: 'quality',
+      title: '枪头泄漏问题',
+      description: '使用中发现3盒枪头存在微量泄漏，不符合实验精度要求，已退回2盒',
+      orderId: order.id,
+      orderNo: order.orderNo,
+      status: 'processing',
+      level: 'medium',
+      handler: defaultHandler,
+      handlerName: defaultHandlerName,
+      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+  }
+
+  records.push({
+    id: 'except_003',
+    supplierId: 'sup_003',
+    type: 'service',
+    title: '售后服务响应慢',
+    description: '手套质量问题反馈后3天才回复',
+    status: 'pending',
+    level: 'low',
+    createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+  })
 
   saveExceptionRecordsToStorage(records)
   return records

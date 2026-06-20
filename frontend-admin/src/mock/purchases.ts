@@ -441,72 +441,117 @@ function initMockOrders(): PurchaseOrder[] {
 
   const receiveRecords: PurchaseReceiveRecord[] = []
   const returnRecords: PurchaseReturnRecord[] = []
-  const now = formatDate(new Date())
 
-  orders.forEach(order => {
-    if (order.status === 'partial_received' || order.status === 'fully_received' || order.status === 'completed') {
-      order.items.forEach(item => {
-        if (item.receivedQuantity > 0) {
-          const failRate = order.supplierId === 'sup_002' ? 0.15 : 0.02
-          const returnRate = order.supplierId === 'sup_002' ? 0.1 : 0.01
+  const partialOrder = orders.find(o => o.status === 'partial_received')
+  if (partialOrder) {
+    const deliveryDate = partialOrder.actualDeliveryDate || partialOrder.updatedAt
+    partialOrder.items.forEach(item => {
+      const receivedQty = item.receivedQuantity || 0
+      if (receivedQty <= 0) return
 
-          let remainingReceived = item.receivedQuantity
-          let batchNum = 0
-
-          while (remainingReceived > 0) {
-            batchNum++
-            const batchQuantity = Math.min(remainingReceived, Math.ceil(item.quantity / 2))
-            remainingReceived -= batchQuantity
-
-            const random = Math.random()
-            let stockInStatus: 'pending' | 'completed' | 'failed' = 'completed'
-            if (random < failRate) {
-              stockInStatus = 'failed'
-            } else if (random < failRate + 0.05) {
-              stockInStatus = 'pending'
-            }
-
-            receiveRecords.push({
-              id: generateId(),
-              orderId: order.id,
-              itemId: item.id,
-              itemName: item.itemName,
-              receivedQuantity: batchQuantity,
-              unit: item.unit,
-              receivedDate: order.actualDeliveryDate || order.updatedAt,
-              receiverId: 'user_manager_1',
-              receiverName: '张主任',
-              batchNumber: order.itemType === 'reagent' ? `B${new Date(order.createdAt).getTime().toString().slice(-6)}${batchNum}` : undefined,
-              productionDate: order.itemType === 'reagent' ? formatDate(new Date(new Date(order.createdAt).getTime() - 30 * 24 * 60 * 60 * 1000)) : undefined,
-              expiryDate: order.itemType === 'reagent' ? formatDate(new Date(new Date(order.createdAt).getTime() + 365 * 24 * 60 * 60 * 1000)) : undefined,
-              storageLocation: '冷藏柜A-01',
-              remark: stockInStatus === 'failed' ? '质量不合格，拒收' : (stockInStatus === 'pending' ? '待检验' : '入库验收通过'),
-              stockInStatus,
-              createdAt: order.actualDeliveryDate || now,
-            })
-
-            if (stockInStatus === 'completed' && Math.random() < returnRate && batchQuantity > 2) {
-              const returnQty = Math.max(1, Math.floor(batchQuantity * 0.2))
-              returnRecords.push({
-                id: generateId(),
-                orderId: order.id,
-                itemId: item.id,
-                itemName: item.itemName,
-                returnedQuantity: returnQty,
-                unit: item.unit,
-                returnedDate: formatDate(new Date(new Date(order.actualDeliveryDate || order.updatedAt).getTime() + 1 * 24 * 60 * 60 * 1000)),
-                returnerId: 'user_lab_1',
-                returnerName: '李研究员',
-                reason: '使用中发现部分产品质量异常',
-                remark: '退回供应商',
-                createdAt: now,
-              })
-            }
-          }
-        }
+      receiveRecords.push({
+        id: generateId(),
+        orderId: partialOrder.id,
+        itemId: item.id,
+        itemName: item.itemName,
+        receivedQuantity: receivedQty,
+        unit: item.unit,
+        receivedDate: deliveryDate,
+        receiverId: 'user_manager_1',
+        receiverName: '张主任',
+        batchNumber: partialOrder.itemType === 'reagent' ? `B2026061901` : undefined,
+        productionDate: partialOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() - 30 * 24 * 60 * 60 * 1000)) : undefined,
+        expiryDate: partialOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() + 365 * 24 * 60 * 60 * 1000)) : undefined,
+        storageLocation: '冷藏柜A-01',
+        remark: '入库验收通过',
+        stockInStatus: 'completed',
+        createdAt: deliveryDate,
       })
-    }
-  })
+    })
+  }
+
+  const completedOrder = orders.find(o => o.status === 'completed')
+  if (completedOrder) {
+    const deliveryDate = completedOrder.actualDeliveryDate || completedOrder.updatedAt
+    const dayBefore = formatDate(new Date(new Date(deliveryDate).getTime() - 1 * 24 * 60 * 60 * 1000))
+
+    completedOrder.items.forEach(item => {
+      const receivedQty = item.receivedQuantity || 0
+      if (receivedQty <= 0) return
+
+      receiveRecords.push({
+        id: generateId(),
+        orderId: completedOrder.id,
+        itemId: item.id,
+        itemName: item.itemName,
+        receivedQuantity: 25,
+        unit: item.unit,
+        receivedDate: dayBefore,
+        receiverId: 'user_manager_1',
+        receiverName: '张主任',
+        batchNumber: completedOrder.itemType === 'reagent' ? `B2026061001` : undefined,
+        productionDate: completedOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() - 60 * 24 * 60 * 60 * 1000)) : undefined,
+        expiryDate: completedOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() + 540 * 24 * 60 * 60 * 1000)) : undefined,
+        storageLocation: '耗材柜A-02',
+        remark: '入库验收通过',
+        stockInStatus: 'completed',
+        createdAt: dayBefore,
+      })
+
+      receiveRecords.push({
+        id: generateId(),
+        orderId: completedOrder.id,
+        itemId: item.id,
+        itemName: item.itemName,
+        receivedQuantity: 3,
+        unit: item.unit,
+        receivedDate: deliveryDate,
+        receiverId: 'user_lab_1',
+        receiverName: '李研究员',
+        batchNumber: completedOrder.itemType === 'reagent' ? `B2026061002` : undefined,
+        productionDate: completedOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() - 60 * 24 * 60 * 60 * 1000)) : undefined,
+        expiryDate: completedOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() + 540 * 24 * 60 * 60 * 1000)) : undefined,
+        storageLocation: '耗材柜A-02',
+        remark: '外包装破损，部分产品变形，质量不合格，拒收',
+        stockInStatus: 'failed',
+        createdAt: deliveryDate,
+      })
+
+      receiveRecords.push({
+        id: generateId(),
+        orderId: completedOrder.id,
+        itemId: item.id,
+        itemName: item.itemName,
+        receivedQuantity: 2,
+        unit: item.unit,
+        receivedDate: deliveryDate,
+        receiverId: 'user_lab_1',
+        receiverName: '李研究员',
+        batchNumber: completedOrder.itemType === 'reagent' ? `B2026061003` : undefined,
+        productionDate: completedOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() - 60 * 24 * 60 * 60 * 1000)) : undefined,
+        expiryDate: completedOrder.itemType === 'reagent' ? formatDate(new Date(new Date(deliveryDate).getTime() + 540 * 24 * 60 * 60 * 1000)) : undefined,
+        storageLocation: '耗材柜A-02',
+        remark: '入库验收通过',
+        stockInStatus: 'completed',
+        createdAt: deliveryDate,
+      })
+
+      returnRecords.push({
+        id: generateId(),
+        orderId: completedOrder.id,
+        itemId: item.id,
+        itemName: item.itemName,
+        returnedQuantity: 2,
+        unit: item.unit,
+        returnedDate: formatDate(new Date(new Date(deliveryDate).getTime() + 2 * 24 * 60 * 60 * 1000)),
+        returnerId: 'user_lab_1',
+        returnerName: '李研究员',
+        reason: '使用中发现3盒枪头存在微量泄漏，不符合实验精度要求',
+        remark: '退回供应商处理',
+        createdAt: formatDate(new Date(new Date(deliveryDate).getTime() + 2 * 24 * 60 * 60 * 1000)),
+      })
+    })
+  }
 
   saveReceiveRecordsToStorage(receiveRecords)
   saveReturnRecordsToStorage(returnRecords)
