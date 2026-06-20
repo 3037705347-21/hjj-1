@@ -23,7 +23,6 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import type { PageResult } from '@/types/common'
 import { formatDate } from '@/utils/date'
 import { usePermission } from '@/composables/usePermission'
-import { useAuditLog } from '@/composables/useAuditLog'
 import type {
   ApprovalRecord,
   ApprovalType,
@@ -49,7 +48,6 @@ import type { SavedFilter } from '@/composables/useSavedFilters'
 
 const router = useRouter()
 const permission = usePermission()
-const auditLog = useAuditLog()
 
 const activeTab = ref<'all' | 'pending' | 'my'>('all')
 
@@ -264,8 +262,7 @@ const handleSubmitApproval = async () => {
   }
   submitLoading.value = true
   try {
-    const result = await mockSubmitApproval({ ...submitForm })
-    auditLog.logApproval(result.id, result.title, 'submit', submitForm.remark || '提交审批')
+    await mockSubmitApproval({ ...submitForm })
     showSubmitDialog.value = false
     fetchData()
     fetchStats()

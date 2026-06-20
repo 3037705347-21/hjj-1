@@ -32,6 +32,18 @@ export type PermissionCode =
   | 'approval:submit'
   | 'approval:handle'
   | 'approval:approve'
+  | 'purchase:request:view'
+  | 'purchase:request:create'
+  | 'purchase:request:edit'
+  | 'purchase:request:delete'
+  | 'purchase:request:submit'
+  | 'purchase:request:approve'
+  | 'purchase:order:view'
+  | 'purchase:order:create'
+  | 'purchase:order:edit'
+  | 'purchase:order:receive'
+  | 'purchase:order:return'
+  | 'purchase:order:complete'
 
 export type DataScope = 'all' | 'lab' | 'department' | 'group' | 'self'
 
@@ -73,6 +85,18 @@ export const permissionLabels: Record<PermissionCode, string> = {
   'approval:submit': '提交审批',
   'approval:handle': '处理审批',
   'approval:approve': '审批通过/驳回',
+  'purchase:request:view': '查看采购申请',
+  'purchase:request:create': '创建采购申请',
+  'purchase:request:edit': '编辑采购申请',
+  'purchase:request:delete': '删除采购申请',
+  'purchase:request:submit': '提交采购申请',
+  'purchase:request:approve': '审批采购申请',
+  'purchase:order:view': '查看采购单',
+  'purchase:order:create': '创建采购单',
+  'purchase:order:edit': '编辑采购单',
+  'purchase:order:receive': '采购到货登记',
+  'purchase:order:return': '采购退货',
+  'purchase:order:complete': '完成采购单',
 }
 
 export const dataScopeLabels: Record<DataScope, string> = {
@@ -116,6 +140,18 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'approval:submit',
     'approval:handle',
     'approval:approve',
+    'purchase:request:view',
+    'purchase:request:create',
+    'purchase:request:edit',
+    'purchase:request:delete',
+    'purchase:request:submit',
+    'purchase:request:approve',
+    'purchase:order:view',
+    'purchase:order:create',
+    'purchase:order:edit',
+    'purchase:order:receive',
+    'purchase:order:return',
+    'purchase:order:complete',
   ],
   lab_manager: [
     'dashboard:view',
@@ -143,6 +179,18 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'approval:view',
     'approval:submit',
     'approval:handle',
+    'purchase:request:view',
+    'purchase:request:create',
+    'purchase:request:edit',
+    'purchase:request:delete',
+    'purchase:request:submit',
+    'purchase:request:approve',
+    'purchase:order:view',
+    'purchase:order:create',
+    'purchase:order:edit',
+    'purchase:order:receive',
+    'purchase:order:return',
+    'purchase:order:complete',
   ],
   lab_staff: [
     'dashboard:view',
@@ -154,6 +202,10 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'alert:view',
     'approval:view',
     'approval:submit',
+    'purchase:request:view',
+    'purchase:request:create',
+    'purchase:request:edit',
+    'purchase:request:submit',
   ],
 }
 

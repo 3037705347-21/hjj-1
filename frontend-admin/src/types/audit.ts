@@ -8,6 +8,7 @@ export type AuditModule =
   | 'alert'
   | 'approval'
   | 'system'
+  | 'purchase'
 
 export type AuditOperationType =
   | 'login'
@@ -48,6 +49,18 @@ export type AuditOperationType =
   | 'in'
   | 'out'
   | 'receive'
+  | 'purchase_request_create'
+  | 'purchase_request_edit'
+  | 'purchase_request_submit'
+  | 'purchase_request_approve'
+  | 'purchase_request_reject'
+  | 'purchase_request_delete'
+  | 'purchase_order_create'
+  | 'purchase_order_edit'
+  | 'purchase_order_start'
+  | 'purchase_receive'
+  | 'purchase_return'
+  | 'purchase_order_complete'
 
 export interface AuditLog {
   id: string
@@ -85,6 +98,7 @@ export const auditModuleLabels: Record<AuditModule, string> = {
   alert: '预警中心',
   approval: '审批管理',
   system: '系统配置',
+  purchase: '采购管理',
 }
 
 export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
@@ -126,6 +140,18 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   approval_approve: '审批通过',
   approval_reject: '审批驳回',
   receive: '采购入库',
+  purchase_request_create: '创建采购申请',
+  purchase_request_edit: '编辑采购申请',
+  purchase_request_submit: '提交采购申请',
+  purchase_request_approve: '审批通过采购申请',
+  purchase_request_reject: '审批驳回采购申请',
+  purchase_request_delete: '删除采购申请',
+  purchase_order_create: '创建采购单',
+  purchase_order_edit: '编辑采购单',
+  purchase_order_start: '开始采购',
+  purchase_receive: '到货登记',
+  purchase_return: '采购退货',
+  purchase_order_complete: '完成采购单',
 }
 
 export interface AuditLogFilterParams {

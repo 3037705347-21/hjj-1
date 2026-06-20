@@ -508,7 +508,9 @@ export function mockExportAuditLogs(filters?: AuditLogFilterParams): Promise<Aud
             (log) =>
               log.operatorName.toLowerCase().includes(kw) ||
               log.targetName.toLowerCase().includes(kw) ||
-              log.remark.toLowerCase().includes(kw)
+              log.remark.toLowerCase().includes(kw) ||
+              log.beforeContent.toLowerCase().includes(kw) ||
+              log.afterContent.toLowerCase().includes(kw)
           )
         }
 

@@ -11,6 +11,9 @@ import AlertsPage from '@/pages/AlertsPage.vue'
 import AuditLogsPage from '@/pages/AuditLogsPage.vue'
 import ApprovalsPage from '@/pages/ApprovalsPage.vue'
 import SystemSettingsPage from '@/pages/SystemSettingsPage.vue'
+import PurchaseRequestsPage from '@/pages/PurchaseRequestsPage.vue'
+import PurchaseOrdersPage from '@/pages/PurchaseOrdersPage.vue'
+import PurchaseDetailPage from '@/pages/PurchaseDetailPage.vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
 
@@ -81,6 +84,30 @@ const routes: RouteRecordRaw[] = [
         name: 'approvals',
         component: ApprovalsPage,
         meta: { title: '审批管理', permissions: ['approval:view'] },
+      },
+      {
+        path: 'purchases',
+        name: 'purchase-requests',
+        component: PurchaseRequestsPage,
+        meta: { title: '采购申请', permissions: ['purchase:request:view'] },
+      },
+      {
+        path: 'purchases/:id',
+        name: 'purchase-detail',
+        component: PurchaseDetailPage,
+        meta: { title: '采购详情', permissions: ['purchase:request:view'] },
+      },
+      {
+        path: 'purchase-orders',
+        name: 'purchase-orders',
+        component: PurchaseOrdersPage,
+        meta: { title: '采购单', permissions: ['purchase:order:view'] },
+      },
+      {
+        path: 'purchases/orders/:id',
+        name: 'purchase-order-detail',
+        component: PurchaseDetailPage,
+        meta: { title: '采购单详情', permissions: ['purchase:order:view'] },
       },
       {
         path: 'system-settings',

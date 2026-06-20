@@ -148,6 +148,7 @@ const getModuleColor = (module: AuditModule): string => {
     alert: 'bg-amber-100 text-amber-700',
     approval: 'bg-indigo-100 text-indigo-700',
     system: 'bg-gray-100 text-gray-700',
+    purchase: 'bg-orange-100 text-orange-700',
   }
   return colors[module] || 'bg-gray-100 text-gray-700'
 }

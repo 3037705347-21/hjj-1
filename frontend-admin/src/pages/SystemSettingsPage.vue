@@ -15,13 +15,11 @@ import {
 } from 'lucide-vue-next'
 import { formatDate } from '@/utils/date'
 import { usePermission } from '@/composables/usePermission'
-import { useAuditLog } from '@/composables/useAuditLog'
 import type { SystemConfigItem, SystemConfigKey } from '@/types/system'
 import { configGroups } from '@/types/system'
 import { mockGetSystemConfigs, mockUpdateSystemConfig } from '@/mock/system'
 
 const permission = usePermission()
-const auditLog = useAuditLog()
 
 const loading = ref(false)
 const saving = ref(false)

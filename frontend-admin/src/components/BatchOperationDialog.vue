@@ -22,20 +22,6 @@ import { formatDate } from '@/utils/date'
 import ScanSearchBox from './ScanSearchBox.vue'
 import { parseLabelCode } from '@/utils/label'
 import type { LabelEntityType } from '@/types/label'
-import { useAuditLog } from '@/composables/useAuditLog'
-
-const auditLog = useAuditLog()
-
-function formatBatchContent(b: any): string {
-  const parts: string[] = []
-  parts.push(`批次号: ${b.batchNumber}`)
-  if (b.reagentName) parts.push(`试剂: ${b.reagentName}`)
-  parts.push(`数量: ${b.remainingQuantity}/${b.initialQuantity || b.currentQuantity}`)
-  if (b.storageLocation) parts.push(`库位: ${b.storageLocation}`)
-  parts.push(`有效期: ${b.expiryDate}`)
-  if (b.status) parts.push(`状态: ${b.status}`)
-  return parts.join(', ')
-}
 
 const props = defineProps<{
   visible: boolean
@@ -151,7 +137,6 @@ const handleSubmit = async () => {
 
   loading.value = true
   try {
-    const beforeContent = props.batch ? formatBatchContent(props.batch) : ''
     await mockBatchOperation(props.batch.id, {
       type: props.operationType,
       quantity: form.quantity,
@@ -160,23 +145,6 @@ const handleSubmit = async () => {
       targetLocation: form.targetLocation || undefined,
       newExpiryDate: form.newExpiryDate || undefined,
     })
-    if (props.batch && props.operationType) {
-      const operationRemark = [
-        form.quantity ? `数量:${form.quantity}` : '',
-        form.reason ? `原因:${form.reason}` : '',
-        form.targetLocation ? `目标库位:${form.targetLocation}` : '',
-        form.newExpiryDate ? `新有效期:${form.newExpiryDate}` : '',
-        form.remark ? `备注:${form.remark}` : '',
-      ].filter(Boolean).join(', ')
-      auditLog.logBatchOperation(
-        props.batch.id,
-        props.batch.batchNumber,
-        props.batch.reagentName,
-        props.operationType,
-        beforeContent,
-        operationRemark
-      )
-    }
     close()
     emit('success')
   } catch (e: any) {

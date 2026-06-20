@@ -575,7 +575,7 @@ export function mockCreateConsumable(data: ConsumableFormData): Promise<Consumab
         saveOperationsToStorage(operations)
       }
 
-      addAuditLog({ module: 'consumable', operationType: 'create', targetType: 'consumable', targetId: newConsumable.id, targetName: newConsumable.name, afterContent: `分类: ${newConsumable.category}, 规格: ${newConsumable.specification}, 库存: ${newConsumable.stockQuantity} ${newConsumable.unit}`, remark: '新增耗材' })
+      addAuditLog({ module: 'consumable', operationType: 'create', targetType: 'consumable', targetId: newConsumable.id, targetName: newConsumable.name, afterContent: `名称: ${newConsumable.name}, 分类: ${newConsumable.category}, 规格: ${newConsumable.specification}, 单位: ${newConsumable.unit}, 库存: ${newConsumable.stockQuantity}, 库位: ${newConsumable.location || '未设置'}, 厂家: ${newConsumable.manufacturer || '未设置'}`, remark: '新增耗材' })
 
       resolve(newConsumable)
     }, 300)
@@ -594,13 +594,17 @@ export function mockUpdateConsumable(
         reject(new Error('耗材不存在'))
         return
       }
+      const oldConsumable = consumables[index]
+      const beforeContent = `名称: ${oldConsumable.name}, 分类: ${oldConsumable.category}, 规格: ${oldConsumable.specification}, 单位: ${oldConsumable.unit}, 库存: ${oldConsumable.stockQuantity}, 库位: ${oldConsumable.location || '未设置'}`
       consumables[index] = {
         ...consumables[index],
         ...data,
         updatedAt: new Date().toISOString(),
       }
       saveConsumablesToStorage(consumables)
-      addAuditLog({ module: 'consumable', operationType: 'update', targetType: 'consumable', targetId: id, targetName: consumables[index].name, afterContent: `分类: ${consumables[index].category}, 规格: ${consumables[index].specification}, 库存: ${consumables[index].stockQuantity} ${consumables[index].unit}`, remark: '编辑耗材' })
+      const newConsumable = consumables[index]
+      const afterContent = `名称: ${newConsumable.name}, 分类: ${newConsumable.category}, 规格: ${newConsumable.specification}, 单位: ${newConsumable.unit}, 库存: ${newConsumable.stockQuantity}, 库位: ${newConsumable.location || '未设置'}`
+      addAuditLog({ module: 'consumable', operationType: 'update', targetType: 'consumable', targetId: id, targetName: consumables[index].name, beforeContent, afterContent, remark: '编辑耗材' })
       resolve(consumables[index])
     }, 300)
   })
@@ -610,6 +614,7 @@ export function mockDeleteConsumable(id: string): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => {
       const consumables = getConsumablesFromStorage()
+      const target = consumables.find(c => c.id === id)
       const filtered = consumables.filter((c) => c.id !== id)
       saveConsumablesToStorage(filtered)
 
@@ -617,7 +622,10 @@ export function mockDeleteConsumable(id: string): Promise<void> {
       const filteredOps = operations.filter((op) => op.consumableId !== id)
       saveOperationsToStorage(filteredOps)
 
-      addAuditLog({ module: 'consumable', operationType: 'delete', targetType: 'consumable', targetId: id, targetName: '耗材', remark: '删除耗材' })
+      if (target) {
+        const beforeContent = `名称: ${target.name}, 分类: ${target.category}, 规格: ${target.specification}, 库存: ${target.stockQuantity} ${target.unit}`
+        addAuditLog({ module: 'consumable', operationType: 'delete', targetType: 'consumable', targetId: id, targetName: target.name, beforeContent, remark: '删除耗材' })
+      }
 
       resolve()
     }, 200)

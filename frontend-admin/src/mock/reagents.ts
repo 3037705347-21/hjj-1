@@ -462,13 +462,17 @@ export function mockUpdateReagent(id: string, data: ReagentFormData): Promise<Re
         reject(new Error('试剂不存在'))
         return
       }
+      const oldReagent = reagents[index]
+      const beforeContent = `名称: ${oldReagent.name}, 分类: ${oldReagent.category}, 规格: ${oldReagent.specification}, 储存条件: ${oldReagent.storageCondition}, 状态: ${oldReagent.enabled ? '启用' : '停用'}`
       reagents[index] = {
         ...reagents[index],
         ...data,
         updatedAt: new Date().toISOString(),
       }
       saveReagentsToStorage(reagents)
-      addAuditLog({ module: 'reagent', operationType: 'update', targetType: 'reagent', targetId: id, targetName: reagents[index].name, beforeContent: `更新前数据`, afterContent: `分类: ${reagents[index].category}, 规格: ${reagents[index].specification}`, remark: '编辑试剂' })
+      const newReagent = reagents[index]
+      const afterContent = `名称: ${newReagent.name}, 分类: ${newReagent.category}, 规格: ${newReagent.specification}, 储存条件: ${newReagent.storageCondition}, 状态: ${newReagent.enabled ? '启用' : '停用'}`
+      addAuditLog({ module: 'reagent', operationType: 'update', targetType: 'reagent', targetId: id, targetName: reagents[index].name, beforeContent, afterContent, remark: '编辑试剂' })
       resolve(reagents[index])
     }, 300)
   })
@@ -478,9 +482,13 @@ export function mockDeleteReagent(id: string): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => {
       const reagents = getReagentsFromStorage()
+      const target = reagents.find(r => r.id === id)
       const filtered = reagents.filter(r => r.id !== id)
       saveReagentsToStorage(filtered)
-      addAuditLog({ module: 'reagent', operationType: 'delete', targetType: 'reagent', targetId: id, targetName: '试剂', remark: '删除试剂' })
+      if (target) {
+        const beforeContent = `名称: ${target.name}, 分类: ${target.category}, 规格: ${target.specification}`
+        addAuditLog({ module: 'reagent', operationType: 'delete', targetType: 'reagent', targetId: id, targetName: target.name, beforeContent, remark: '删除试剂' })
+      }
       resolve()
     }, 200)
   })

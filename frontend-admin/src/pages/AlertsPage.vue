@@ -60,30 +60,6 @@ import {
 import type { PageResult } from '@/types/common'
 import { formatDate } from '@/utils/date'
 import { usePermission } from '@/composables/usePermission'
-import { useAuditLog } from '@/composables/useAuditLog'
-
-const auditLog = useAuditLog()
-
-const originalRuleData = ref<AlertRule | null>(null)
-
-function formatAlertContent(a: AlertRecord): string {
-  const parts: string[] = []
-  parts.push(`类型: ${alertTypeLabels[a.type] || a.type}`)
-  parts.push(`级别: ${alertLevelLabels[a.level] || a.level}`)
-  parts.push(`对象: ${a.targetName}`)
-  parts.push(`状态: ${alertStatusLabels[a.status] || a.status}`)
-  if (a.assigneeName) parts.push(`处理人: ${a.assigneeName}`)
-  return parts.join(', ')
-}
-
-function formatRuleContent(r: AlertRule | any): string {
-  const parts: string[] = []
-  parts.push(`级别: ${alertLevelLabels[r.level] || r.level}`)
-  parts.push(`阈值: ${r.threshold ?? '默认'}`)
-  parts.push(`状态: ${r.enabled ? '启用' : '禁用'}`)
-  if (r.description) parts.push(`描述: ${r.description}`)
-  return parts.join(', ')
-}
 
 const router = useRouter()
 const permission = usePermission()
@@ -212,7 +188,6 @@ const openAlertDetail = async (alertItem: AlertRecord) => {
   showDetailModal.value = true
   if (alertItem.status === 'unread') {
     await mockMarkAlertRead(alertItem.id)
-    auditLog.logAlertHandle(alertItem.id, alertItem.title, 'mark_read', formatAlertContent(alertItem), '标记已读')
     alertItem.status = 'read'
     fetchStats()
   }
@@ -238,24 +213,20 @@ const handleActionSubmit = async () => {
   if (!currentAlert.value) return
   actionLoading.value = true
   try {
-    const beforeContent = formatAlertContent(currentAlert.value)
     if (actionMode.value === 'ignore') {
       await mockIgnoreAlert(currentAlert.value.id, actionForm.remark)
-      auditLog.logAlertHandle(currentAlert.value.id, currentAlert.value.title, 'ignore', beforeContent, actionForm.remark || '忽略预警')
     } else if (actionMode.value === 'assign') {
       if (!actionForm.assignee) {
         alert('请选择处理人')
         return
       }
       await mockAssignAlert(currentAlert.value.id, actionForm.assignee, actionForm.assigneeName)
-      auditLog.logAlertHandle(currentAlert.value.id, currentAlert.value.title, 'assign', beforeContent, `转交给: ${actionForm.assigneeName}`)
     } else if (actionMode.value === 'resolve') {
       if (!actionForm.result.trim()) {
         alert('请填写处理结果')
         return
       }
       await mockResolveAlert(currentAlert.value.id, actionForm.result)
-      auditLog.logAlertHandle(currentAlert.value.id, currentAlert.value.title, 'resolve', beforeContent, `处理结果: ${actionForm.result}`)
     }
     showActionModal.value = false
     fetchAlerts()
@@ -277,9 +248,7 @@ const handleActionSubmit = async () => {
 
 const handleMarkRead = async (alertItem: AlertRecord) => {
   try {
-    const beforeContent = formatAlertContent(alertItem)
     await mockMarkAlertRead(alertItem.id)
-    auditLog.logAlertHandle(alertItem.id, alertItem.title, 'mark_read', beforeContent, '标记已读')
     fetchAlerts()
     fetchStats()
   } catch (e: any) {
@@ -294,7 +263,6 @@ const handleSelectAssignee = (handler: typeof availableHandlers[0]) => {
 
 const openRuleEdit = (rule: AlertRule) => {
   currentRule.value = rule
-  originalRuleData.value = { ...rule }
   ruleForm.name = rule.name
   ruleForm.description = rule.description
   ruleForm.level = rule.level
@@ -305,9 +273,7 @@ const openRuleEdit = (rule: AlertRule) => {
 
 const handleRuleToggle = async (rule: AlertRule) => {
   try {
-    const beforeContent = formatRuleContent(rule)
     await mockToggleAlertRule(rule.id)
-    auditLog.logAlertRuleUpdate(rule.id, rule.name, 'enabled', String(rule.enabled), String(!rule.enabled), `切换规则${rule.enabled ? '禁用' : '启用'}`)
     fetchRules()
   } catch (e: any) {
     alert(e.message || '操作失败')
@@ -322,7 +288,6 @@ const handleRuleSubmit = async () => {
   }
   ruleEditLoading.value = true
   try {
-    const beforeContent = originalRuleData.value ? formatRuleContent(originalRuleData.value) : ''
     await mockUpdateAlertRule(currentRule.value.id, {
       name: ruleForm.name,
       description: ruleForm.description,
@@ -330,8 +295,6 @@ const handleRuleSubmit = async () => {
       enabled: ruleForm.enabled,
       threshold: ruleForm.threshold,
     })
-    auditLog.logAlertRuleUpdate(currentRule.value.id, ruleForm.name, 'config', beforeContent, formatRuleContent(ruleForm), '修改预警规则')
-    originalRuleData.value = null
     showRuleEditModal.value = false
     fetchRules()
   } catch (e: any) {
