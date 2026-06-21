@@ -14,6 +14,7 @@ import {
   ClipboardCheck,
   CalendarClock,
   ScanLine,
+  MapPin,
 } from 'lucide-vue-next'
 import type { ReagentBatch, BatchOperationType, BatchOperationFormData } from '@/types/batch'
 import { operationTypeLabels, operationTypeConfigs } from '@/types/batch'
@@ -22,6 +23,9 @@ import { formatDate } from '@/utils/date'
 import ScanSearchBox from './ScanSearchBox.vue'
 import { parseLabelCode } from '@/utils/label'
 import type { LabelEntityType } from '@/types/label'
+import LocationSelector from './LocationSelector.vue'
+import { mockGetAllLocations, getLocationPath } from '@/mock/locations'
+import type { StorageLocation } from '@/types/location'
 
 const props = defineProps<{
   visible: boolean
@@ -44,6 +48,45 @@ const form = reactive<BatchOperationFormData>({
   targetLocation: '',
   newExpiryDate: '',
 })
+
+const showLocationSelector = ref(false)
+const targetLocationId = ref('')
+const allLocationsCache = ref<StorageLocation[]>([])
+
+const loadAllLocations = async () => {
+  allLocationsCache.value = await mockGetAllLocations()
+}
+const findLocationIdByCodeOrName = (text: string): string => {
+  if (!text) return ''
+  const t = text.toLowerCase().trim()
+  const found = allLocationsCache.value.find(l =>
+    l.code.toLowerCase() === t || l.name.toLowerCase() === t
+  )
+  return found?.id || ''
+}
+const openLocationSelector = () => {
+  targetLocationId.value = findLocationIdByCodeOrName(form.targetLocation || '')
+  showLocationSelector.value = true
+}
+const handleLocationConfirm = (locId: string, location?: StorageLocation) => {
+  targetLocationId.value = locId
+  if (location) {
+    form.targetLocation = location.code
+  }
+  showLocationSelector.value = false
+}
+const getLocationById = (locId: string): StorageLocation | undefined => {
+  return allLocationsCache.value.find(l => l.id === locId)
+}
+
+watch(
+  () => props.visible,
+  (val) => {
+    if (val) {
+      loadAllLocations()
+    }
+  }
+)
 
 const iconComponents: Record<string, any> = {
   ArrowUpCircle,
@@ -229,12 +272,29 @@ const handleSubmit = async () => {
           <label class="block text-sm font-medium text-gray-700 mb-1.5">
             目标存放位置 <span class="text-red-500">*</span>
           </label>
-          <input
-            v-model="form.targetLocation"
-            type="text"
-            class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-            placeholder="如：B-02-05"
+          <div class="relative">
+            <input
+              v-model="form.targetLocation"
+              type="text"
+              class="w-full px-4 py-2.5 pr-24 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+              placeholder="如：B-02-05"
+            >
+            <button
+              type="button"
+              class="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-600 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
+              @click="openLocationSelector"
+            >
+              <MapPin class="w-3 h-3" />
+              选择库位
+            </button>
+          </div>
+          <div
+            v-if="targetLocationId && getLocationById(targetLocationId)"
+            class="mt-1 text-xs text-gray-500 flex items-center gap-1"
           >
+            <MapPin class="w-3 h-3" />
+            {{ getLocationPath(allLocationsCache, targetLocationId) }}
+          </div>
         </div>
 
         <div
@@ -302,5 +362,12 @@ const handleSubmit = async () => {
         </button>
       </div>
     </div>
+
+    <LocationSelector
+      v-model:visible="showLocationSelector"
+      :model-value="targetLocationId"
+      :only-enabled="true"
+      @confirm="handleLocationConfirm"
+    />
   </div>
 </template>

@@ -80,6 +80,10 @@ import BatchOperationDialog from '@/components/BatchOperationDialog.vue'
 import LabelPrintDialog from '@/components/LabelPrintDialog.vue'
 import ScanSearchBox from '@/components/ScanSearchBox.vue'
 import ScanResultCard from '@/components/ScanResultCard.vue'
+import LocationSelector from '@/components/LocationSelector.vue'
+import { mockGetAllLocations } from '@/mock/locations'
+import type { StorageLocation } from '@/types/location'
+import { getLocationPath } from '@/mock/locations'
 
 const route = useRoute()
 const permission = usePermission()
@@ -143,6 +147,7 @@ const createForm = reactive<BatchFormData>({
   expiryDate: '',
   initialQuantity: 0,
   storageLocation: '',
+  locationId: '',
   receivedDate: formatDate(new Date()),
   remark: '',
 })
@@ -177,6 +182,57 @@ const showBatchEditDialog = ref(false)
 const batchEditType = ref<'location'>('location')
 const batchEditFields = ref<BatchEditField[]>([])
 const batchEditLoading = ref(false)
+
+const showLocationSelector = ref(false)
+const locationSelectorMode = ref<'create' | 'batch'>('create')
+const allLocationsCache = ref<StorageLocation[]>([])
+const createFormLocationId = ref('')
+const batchEditLocationId = ref('')
+
+const getLocationDisplay = (locationText: string): string => {
+  if (!locationText) return ''
+  return locationText
+}
+const getLocationById = (locId: string): StorageLocation | undefined => {
+  return allLocationsCache.value.find(l => l.id === locId)
+}
+const loadAllLocationsCache = async () => {
+  allLocationsCache.value = await mockGetAllLocations()
+}
+const findLocationIdByCodeOrName = (text: string): string => {
+  if (!text) return ''
+  const t = text.toLowerCase().trim()
+  const found = allLocationsCache.value.find(l =>
+    l.code.toLowerCase() === t || l.name.toLowerCase() === t
+  )
+  return found?.id || ''
+}
+
+const openCreateLocationSelector = () => {
+  createFormLocationId.value = findLocationIdByCodeOrName(createForm.storageLocation)
+  locationSelectorMode.value = 'create'
+  showLocationSelector.value = true
+}
+const handleCreateLocationConfirm = (locId: string, location?: StorageLocation) => {
+  createFormLocationId.value = locId
+  createForm.storageLocation = location ? `${location.code}` : createForm.storageLocation
+  createForm.locationId = locId
+  showLocationSelector.value = false
+}
+
+const openBatchEditLocationSelector = () => {
+  batchEditLocationId.value = ''
+  locationSelectorMode.value = 'batch'
+  showLocationSelector.value = true
+}
+const handleBatchEditLocationConfirm = (locId: string, location?: StorageLocation) => {
+  batchEditLocationId.value = locId
+  if (location) {
+    showBatchEditDialog.value = false
+    handleBatchEditConfirm({ storageLocation: location.code })
+  }
+  showLocationSelector.value = false
+}
 
 const showPrintDialog = ref(false)
 const printLabelData = ref<LabelData | null>(null)
@@ -429,6 +485,7 @@ const openCreateModal = () => {
     expiryDate: '',
     initialQuantity: 0,
     storageLocation: '',
+    locationId: '',
     receivedDate: formatDate(new Date()),
     remark: '',
   })

@@ -12,6 +12,7 @@ export type AuditModule =
   | 'supplier'
   | 'requisition'
   | 'stocktake'
+  | 'location'
 
 export type AuditOperationType =
   | 'login'
@@ -83,6 +84,7 @@ export type AuditOperationType =
   | 'stocktake_count'
   | 'stocktake_confirm'
   | 'stocktake_export'
+  | 'location_transfer'
 
 export interface AuditLog {
   id: string
@@ -124,6 +126,7 @@ export const auditModuleLabels: Record<AuditModule, string> = {
   supplier: '供应商管理',
   requisition: '实验领用',
   stocktake: '库存盘点',
+  location: '库位管理',
 }
 
 export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
@@ -196,6 +199,7 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   stocktake_count: '录入实盘',
   stocktake_confirm: '确认盘点结果',
   stocktake_export: '导出盘点报表',
+  location_transfer: '库位调拨',
 }
 
 export interface AuditLogFilterParams {

@@ -20,6 +20,7 @@ import {
   ClipboardCheck,
   Building2,
   FlaskRound,
+  MapPin,
 } from 'lucide-vue-next'
 import { getUserStore } from '@/stores/user'
 import { roleLabels } from '@/types/user'
@@ -56,6 +57,7 @@ const allMenuItems: MenuItem[] = [
   { path: '/suppliers', name: '供应商管理', icon: Building2, permission: 'supplier:view' },
   { path: '/requisitions', name: '实验领用', icon: FlaskRound, permission: 'requisition:view' },
   { path: '/stocktakes', name: '库存盘点', icon: ClipboardCheck, permission: 'stocktake:view' },
+  { path: '/locations', name: '库位管理', icon: MapPin, permission: 'location:view' },
   { path: '/alerts', name: '预警中心', icon: AlertTriangle, permission: 'alert:view' },
   { path: '/approvals', name: '审批管理', icon: FileCheck, permission: 'approval:view' },
   { path: '/audit-logs', name: '审计日志', icon: FileText, permission: 'audit:view' },

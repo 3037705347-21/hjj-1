@@ -12,6 +12,7 @@ import { mockGetAllReagents } from './reagents'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
 import { addAuditLog } from './audit'
+import { getLocationsFromStorage } from './locations'
 
 const BATCH_STORAGE_KEY = 'mock_batches'
 const OPERATION_STORAGE_KEY = 'mock_batch_operations'
@@ -99,6 +100,12 @@ function addYears(date: Date, years: number): Date {
   return result
 }
 
+function resolveLocationId(code: string): string | undefined {
+  const locations = getLocationsFromStorage()
+  const loc = locations.find(l => l.code.toLowerCase() === code.toLowerCase())
+  return loc?.id
+}
+
 function initMockBatches(): ReagentBatch[] {
   const reagentsData = localStorage.getItem('mock_reagents')
   let reagentIds: string[] = []
@@ -134,7 +141,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 100,
       remainingQuantity: 65,
       unit: reagentUnits[reagentIds[0]],
-      storageLocation: 'A-01-03',
+      storageLocation: 'WH-A-R01-C01-S01-01',
+      locationId: resolveLocationId('WH-A-R01-C01-S01-01'),
       receivedDate: '2025-01-20',
       status: 'warning',
       remark: '常用试剂，注意效期',
@@ -149,7 +157,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 200,
       remainingQuantity: 180,
       unit: reagentUnits[reagentIds[0]],
-      storageLocation: 'A-01-04',
+      storageLocation: 'WH-A-R01-C01-S01-02',
+      locationId: resolveLocationId('WH-A-R01-C01-S01-02'),
       receivedDate: '2025-06-15',
       status: 'normal',
       remark: '',
@@ -164,7 +173,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 500,
       remainingQuantity: 120,
       unit: reagentUnits[reagentIds[1]],
-      storageLocation: 'B-02-01',
+      storageLocation: 'WH-A-R01-C01-S02',
+      locationId: resolveLocationId('WH-A-R01-C01-S02'),
       receivedDate: '2024-11-10',
       status: 'expired',
       remark: '已过期，待销毁',
@@ -179,7 +189,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 1000,
       remainingQuantity: 850,
       unit: reagentUnits[reagentIds[1]],
-      storageLocation: 'B-02-02',
+      storageLocation: 'WH-A-R01-C01-S03',
+      locationId: resolveLocationId('WH-A-R01-C01-S03'),
       receivedDate: '2025-04-25',
       status: 'normal',
       remark: '',
@@ -194,7 +205,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 10,
       remainingQuantity: 3.5,
       unit: reagentUnits[reagentIds[2]],
-      storageLocation: 'C-01-02',
+      storageLocation: 'WH-A-R01-C02',
+      locationId: resolveLocationId('WH-A-R01-C02'),
       receivedDate: '2025-03-10',
       status: 'warning',
       remark: '库存偏低',
@@ -209,7 +221,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 8,
       remainingQuantity: 6,
       unit: reagentUnits[reagentIds[3]],
-      storageLocation: 'D-03-01',
+      storageLocation: 'WH-C-R01-C01-S01',
+      locationId: resolveLocationId('WH-C-R01-C01-S01'),
       receivedDate: '2025-02-20',
       status: 'normal',
       remark: '易燃品，注意存放',
@@ -224,7 +237,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 5,
       remainingQuantity: 4.2,
       unit: reagentUnits[reagentIds[5]],
-      storageLocation: 'E-01-05',
+      storageLocation: 'WH-A-R01-C03-S01',
+      locationId: resolveLocationId('WH-A-R01-C03-S01'),
       receivedDate: '2025-05-10',
       status: 'normal',
       remark: '',
@@ -239,7 +253,8 @@ function initMockBatches(): ReagentBatch[] {
       initialQuantity: 20,
       remainingQuantity: 0,
       unit: reagentUnits[reagentIds[7]],
-      storageLocation: 'F-02-03',
+      storageLocation: 'WH-A-R01-C03-S02',
+      locationId: resolveLocationId('WH-A-R01-C03-S02'),
       receivedDate: '2025-01-20',
       status: 'exhausted',
       remark: '已用完，待补货',
@@ -499,6 +514,7 @@ export function mockCreateBatch(data: BatchFormData): Promise<ReagentBatch> {
         remainingQuantity: data.initialQuantity,
         unit: reagent?.unit,
         storageLocation: data.storageLocation,
+        locationId: data.locationId,
         receivedDate: data.receivedDate,
         status: 'normal',
         remark: data.remark,

@@ -76,6 +76,9 @@ import type { LabelData, LabelEntityType } from '@/types/label'
 import { usePermission } from '@/composables/usePermission'
 import { mockGetAllSuppliers } from '@/mock/suppliers'
 import type { Supplier } from '@/types/supplier'
+import LocationSelector from '@/components/LocationSelector.vue'
+import { mockGetAllLocations, getLocationPath } from '@/mock/locations'
+import type { StorageLocation } from '@/types/location'
 
 const router = useRouter()
 const permission = usePermission()
@@ -144,6 +147,7 @@ const formData = reactive<ConsumableFormData>({
   safetyStock: 0,
   manufacturer: '',
   location: '',
+  locationId: '',
   description: '',
   supplierIds: [],
   defaultSupplierId: undefined,
@@ -160,6 +164,43 @@ const importResult = ref<ImportResult | null>(null)
 
 const showBatchDeleteConfirm = ref(false)
 const batchDeleteLoading = ref(false)
+
+const showLocationSelector = ref(false)
+const locationSelectorMode = ref<'form' | 'batch'>('form')
+const allLocationsCache = ref<StorageLocation[]>([])
+
+const loadAllLocationsCache = async () => {
+  allLocationsCache.value = await mockGetAllLocations()
+}
+const openFormLocationSelector = () => {
+  locationSelectorMode.value = 'form'
+  showLocationSelector.value = true
+}
+const handleFormLocationConfirm = (locId: string, location?: StorageLocation) => {
+  if (location) {
+    formData.location = location.code
+    formData.locationId = locId
+  }
+  showLocationSelector.value = false
+}
+const openBatchLocationSelector = () => {
+  locationSelectorMode.value = 'batch'
+  showLocationSelector.value = true
+}
+const handleBatchLocationConfirm = (locId: string, location?: StorageLocation) => {
+  if (location) {
+    showLocationSelector.value = false
+    try {
+      mockBatchUpdateConsumableLocation(selectedIds.value, location.code)
+      selectedIds.value = []
+      fetchData()
+    } catch (e: any) {
+      alert(e.message || '批量修改库位失败')
+    }
+  } else {
+    showLocationSelector.value = false
+  }
+}
 
 const showBatchEditDialog = ref(false)
 const batchEditType = ref<'category' | 'location'>('category')
@@ -311,6 +352,7 @@ const openCreateModal = () => {
     safetyStock: 0,
     manufacturer: '',
     location: '',
+    locationId: '',
     description: '',
     supplierIds: [],
     defaultSupplierId: undefined,
@@ -334,6 +376,7 @@ const openEditModal = async (id: string) => {
         safetyStock: consumable.safetyStock,
         manufacturer: consumable.manufacturer || '',
         location: consumable.location || '',
+        locationId: consumable.locationId || '',
         description: consumable.description || '',
         supplierIds: consumable.supplierIds || [],
         defaultSupplierId: consumable.defaultSupplierId,
@@ -641,6 +684,7 @@ const handleScan = (payload: { entityType: LabelEntityType | null; entityId: str
 onMounted(() => {
   fetchData()
   fetchSuppliers()
+  loadAllLocationsCache()
 })
 </script>
 
@@ -1306,12 +1350,22 @@ onMounted(() => {
               </div>
               <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1.5">存放位置</label>
-                <input
-                  v-model="formData.location"
-                  type="text"
-                  class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-                  placeholder="如：耗材柜A-01"
-                >
+                <div class="relative">
+                  <input
+                    v-model="formData.location"
+                    type="text"
+                    class="w-full px-4 py-2.5 pr-24 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
+                    placeholder="如：耗材柜A-01"
+                  >
+                  <button
+                    type="button"
+                    class="absolute right-1 top-1/2 -translate-y-1/2 px-3 py-1.5 bg-primary-50 hover:bg-primary-100 text-primary-600 text-xs font-medium rounded-md transition-colors flex items-center gap-1"
+                    @click="openFormLocationSelector"
+                  >
+                    <MapPin class="w-3 h-3" />
+                    选择库位
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1445,6 +1499,12 @@ onMounted(() => {
       :default-entity-type="scanEntityType"
       :default-entity-id="scanEntityId"
       @close="showScanResult = false"
+    />
+
+    <LocationSelector
+      v-model:visible="showLocationSelector"
+      :only-enabled="true"
+      @confirm="(locId: string, location?: StorageLocation) => locationSelectorMode === 'form' ? handleFormLocationConfirm(locId, location) : handleBatchLocationConfirm(locId, location)"
     />
   </div>
 </template>

@@ -8,6 +8,7 @@ export interface Consumable {
   safetyStock: number
   manufacturer?: string
   location?: string
+  locationId?: string
   description?: string
   supplierIds?: string[]
   defaultSupplierId?: string
@@ -25,6 +26,7 @@ export interface ConsumableFormData {
   safetyStock: number
   manufacturer?: string
   location?: string
+  locationId?: string
   description?: string
   supplierIds?: string[]
   defaultSupplierId?: string

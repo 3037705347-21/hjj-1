@@ -64,6 +64,12 @@ export type PermissionCode =
   | 'stocktake:confirm'
   | 'stocktake:export'
   | 'stocktake:adjust'
+  | 'location:view'
+  | 'location:create'
+  | 'location:edit'
+  | 'location:delete'
+  | 'location:transfer'
+  | 'location:status'
 
 export type DataScope = 'all' | 'lab' | 'department' | 'group' | 'self'
 
@@ -137,6 +143,12 @@ export const permissionLabels: Record<PermissionCode, string> = {
   'stocktake:confirm': '确认盘点结果',
   'stocktake:export': '导出盘点报表',
   'stocktake:adjust': '库存调整',
+  'location:view': '查看库位',
+  'location:create': '新增库位',
+  'location:edit': '编辑库位',
+  'location:delete': '删除库位',
+  'location:transfer': '库位调拨',
+  'location:status': '启用/停用库位',
 }
 
 export const dataScopeLabels: Record<DataScope, string> = {
@@ -212,6 +224,12 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'stocktake:confirm',
     'stocktake:export',
     'stocktake:adjust',
+    'location:view',
+    'location:create',
+    'location:edit',
+    'location:delete',
+    'location:transfer',
+    'location:status',
   ],
   lab_manager: [
     'dashboard:view',
@@ -268,6 +286,10 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'stocktake:edit',
     'stocktake:count',
     'stocktake:export',
+    'location:view',
+    'location:create',
+    'location:edit',
+    'location:transfer',
   ],
   lab_staff: [
     'dashboard:view',
@@ -289,6 +311,7 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'requisition:register',
     'stocktake:view',
     'stocktake:count',
+    'location:view',
   ],
   safety_officer: [
     'dashboard:view',
@@ -306,6 +329,7 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'requisition:view',
     'requisition:approve',
     'stocktake:view',
+    'location:view',
   ],
   purchase_officer: [
     'dashboard:view',
@@ -329,6 +353,7 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'supplier:qualification:manage',
     'supplier:evaluation:view',
     'stocktake:view',
+    'location:view',
   ],
   finance_officer: [
     'dashboard:view',
@@ -342,6 +367,7 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'requisition:statistics',
     'stocktake:view',
     'stocktake:export',
+    'location:view',
   ],
 }
 

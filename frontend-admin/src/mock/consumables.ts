@@ -12,6 +12,7 @@ import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
 import { addAuditLog } from './audit'
 import type { AuditOperationType } from '@/types/audit'
+import { getLocationsFromStorage } from './locations'
 
 const STORAGE_KEY = 'mock_consumables'
 const OPERATION_STORAGE_KEY = 'mock_consumable_operations'
@@ -52,6 +53,13 @@ function getCurrentUser(): User | null {
   return storage.getUser<User>()
 }
 
+function resolveLocationId(codeOrName: string): string | undefined {
+  const locations = getLocationsFromStorage()
+  const t = codeOrName.toLowerCase().trim()
+  const loc = locations.find(l => l.code.toLowerCase() === t || l.name.toLowerCase() === t)
+  return loc?.id
+}
+
 function initMockConsumables(): Consumable[] {
   const now = new Date().toISOString()
   const consumables: Consumable[] = [
@@ -64,7 +72,8 @@ function initMockConsumables(): Consumable[] {
       stockQuantity: 25,
       safetyStock: 10,
       manufacturer: 'Axygen',
-      location: '耗材柜A-01',
+      location: 'WH-A-R01-C03-S01',
+      locationId: resolveLocationId('WH-A-R01-C03-S01'),
       description: '无酶无热源离心管',
       supplierIds: ['sup_001', 'sup_002'],
       defaultSupplierId: 'sup_001',
@@ -81,7 +90,8 @@ function initMockConsumables(): Consumable[] {
       stockQuantity: 8,
       safetyStock: 5,
       manufacturer: 'Gilson',
-      location: '耗材柜A-02',
+      location: 'WH-A-R01-C03-S02',
+      locationId: resolveLocationId('WH-A-R01-C03-S02'),
       description: '带滤芯吸头',
       supplierIds: ['sup_001'],
       defaultSupplierId: 'sup_001',
@@ -98,7 +108,8 @@ function initMockConsumables(): Consumable[] {
       stockQuantity: 12,
       safetyStock: 5,
       manufacturer: 'Corning',
-      location: '耗材柜B-01',
+      location: 'WH-A-R01-C03-S01',
+      locationId: resolveLocationId('WH-A-R01-C03-S01'),
       description: 'TC处理培养皿',
       supplierIds: ['sup_002'],
       defaultSupplierId: 'sup_002',
@@ -115,7 +126,8 @@ function initMockConsumables(): Consumable[] {
       stockQuantity: 3,
       safetyStock: 5,
       manufacturer: 'Bio-Rad',
-      location: '耗材柜B-02',
+      location: 'WH-A-R01-C03-S02',
+      locationId: resolveLocationId('WH-A-R01-C03-S02'),
       description: '半裙边96孔板',
       supplierIds: ['sup_001', 'sup_003'],
       defaultSupplierId: 'sup_003',
@@ -132,7 +144,8 @@ function initMockConsumables(): Consumable[] {
       stockQuantity: 15,
       safetyStock: 10,
       manufacturer: '英科',
-      location: '耗材柜C-01',
+      location: 'WH-B-R01-C01-S01',
+      locationId: resolveLocationId('WH-B-R01-C01-S01'),
       description: '丁腈手套，无粉',
       supplierIds: ['sup_003'],
       defaultSupplierId: 'sup_003',
@@ -149,7 +162,8 @@ function initMockConsumables(): Consumable[] {
       stockQuantity: 30,
       safetyStock: 20,
       manufacturer: '3M',
-      location: '耗材柜C-02',
+      location: 'WH-B-R01-C01-S01',
+      locationId: resolveLocationId('WH-B-R01-C01-S01'),
       description: '三层防护口罩',
       supplierIds: ['sup_003'],
       defaultSupplierId: 'sup_003',
@@ -167,6 +181,7 @@ function initMockConsumables(): Consumable[] {
       safetyStock: 3,
       manufacturer: 'Whatman',
       location: '耗材柜D-01',
+      locationId: resolveLocationId('耗材柜D-01'),
       description: 'Grade 1 滤纸',
       supplierIds: ['sup_002'],
       defaultSupplierId: 'sup_002',
@@ -184,6 +199,7 @@ function initMockConsumables(): Consumable[] {
       safetyStock: 2,
       manufacturer: 'Bemis',
       location: '耗材柜D-02',
+      locationId: resolveLocationId('耗材柜D-02'),
       description: '实验室通用封口膜',
       supplierIds: ['sup_001', 'sup_002'],
       defaultSupplierId: 'sup_002',
@@ -201,6 +217,7 @@ function initMockConsumables(): Consumable[] {
       safetyStock: 5,
       manufacturer: 'Axygen',
       location: '耗材柜A-03',
+      locationId: resolveLocationId('耗材柜A-03'),
       description: '平盖PCR管',
       supplierIds: ['sup_001'],
       defaultSupplierId: 'sup_001',
@@ -218,6 +235,7 @@ function initMockConsumables(): Consumable[] {
       safetyStock: 10,
       manufacturer: 'Eppendorf',
       location: '耗材柜A-04',
+      locationId: resolveLocationId('耗材柜A-04'),
       description: '普通吸头',
       supplierIds: ['sup_001', 'sup_003'],
       defaultSupplierId: 'sup_001',
@@ -894,6 +912,7 @@ export function mockBatchUpdateConsumableLocation(ids: string[], location: strin
       const user = getCurrentUser()
       const operations = getOperationsFromStorage()
       const now = new Date().toISOString()
+      const resolvedLocationId = resolveLocationId(location)
 
       const updatedConsumables = consumables.map(c => {
         if (ids.includes(c.id) && c.location !== location) {
@@ -913,7 +932,7 @@ export function mockBatchUpdateConsumableLocation(ids: string[], location: strin
             createdAt: now,
           }
           operations.unshift(operation)
-          return { ...c, location, updatedAt: now }
+          return { ...c, location, locationId: resolvedLocationId, updatedAt: now }
         }
         return c
       })

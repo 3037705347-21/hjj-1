@@ -25,6 +25,7 @@ export interface ReagentBatch {
   remainingQuantity: number
   unit?: string
   storageLocation: string
+  locationId?: string
   receivedDate: string
   status: BatchStatus
   remark?: string
@@ -57,6 +58,7 @@ export interface BatchFormData {
   expiryDate: string
   initialQuantity: number
   storageLocation: string
+  locationId?: string
   receivedDate: string
   remark?: string
 }
