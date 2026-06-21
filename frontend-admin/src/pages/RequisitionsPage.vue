@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import {
   Plus,
   Search,
@@ -168,6 +168,21 @@ const registerQuantities = ref<Record<string, number>>({})
 
 const queryTab = ref<'list' | 'project' | 'topic' | 'user'>('list')
 const queryDrillDown = ref<{field: string; value: string; label: string} | null>(null)
+
+const handleDrillDown = async (field: string, value: string, label: string) => {
+  queryDrillDown.value = { field, value, label }
+  queryTab.value = 'list'
+  pagination.page = 1
+  filters.value.status = ''
+  await nextTick()
+  await fetchData()
+}
+
+const clearDrillDown = async () => {
+  queryDrillDown.value = null
+  pagination.page = 1
+  await fetchData()
+}
 
 const statusFilterForTab = computed(() => {
   switch (activeTab.value) {
@@ -603,7 +618,7 @@ onMounted(() => {
             </span>
             <button
               class="p-1 text-primary-500 hover:text-primary-700 hover:bg-primary-100 rounded transition-colors"
-              @click="queryDrillDown = null; fetchData()"
+              @click="clearDrillDown"
             >
               <X class="w-4 h-4" />
             </button>
@@ -816,7 +831,7 @@ onMounted(() => {
                   v-for="item in projectStats"
                   :key="item.projectCode"
                   class="hover:bg-gray-50 transition-colors cursor-pointer"
-                  @click="queryDrillDown = {field: 'projectName', value: item.projectName, label: item.projectName}; queryTab = 'list'"
+                  @click="handleDrillDown('projectName', item.projectName, `项目: ${item.projectName}`)"
                 >
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.projectName }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ item.projectCode }}</td>
@@ -855,7 +870,7 @@ onMounted(() => {
                   v-for="item in topicStats"
                   :key="item.topicCode"
                   class="hover:bg-gray-50 transition-colors cursor-pointer"
-                  @click="queryDrillDown = {field: 'topicCode', value: item.topicCode, label: item.topicName}; queryTab = 'list'"
+                  @click="handleDrillDown('topicCode', item.topicCode, `课题: ${item.topicName}`)"
                 >
                   <td class="px-6 py-4 text-sm text-gray-600">{{ item.topicCode }}</td>
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.topicName }}</td>
@@ -894,7 +909,7 @@ onMounted(() => {
                   v-for="item in userStats"
                   :key="item.userId"
                   class="hover:bg-gray-50 transition-colors cursor-pointer"
-                  @click="queryDrillDown = {field: 'applicantName', value: item.userName, label: item.userName}; queryTab = 'list'"
+                  @click="handleDrillDown('applicantName', item.userName, `使用人: ${item.userName}`)"
                 >
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.userName }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ item.department || '-' }}</td>
