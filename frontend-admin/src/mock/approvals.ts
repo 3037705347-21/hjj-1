@@ -749,18 +749,22 @@ export async function mockTransferApproval(
       const currentNodeIndex = record.nodes.findIndex(n => n.status === 'current')
 
       if (currentNodeIndex >= 0) {
+        const originalNode = record.nodes[currentNodeIndex]
         record.nodes[currentNodeIndex] = {
-          ...record.nodes[currentNodeIndex],
-          status: 'transferred',
+          ...originalNode,
+          status: 'current',
           approverId: data.toUserId,
           approverName: data.toUserName,
+          originalApproverId: originalNode.approverId,
+          originalApproverName: originalNode.approverName,
+          transferredAt: now,
           actionTime: now,
           comment: data.comment,
         }
 
         record.history.push({
           id: generateId(),
-          nodeName: record.nodes[currentNodeIndex].name,
+          nodeName: originalNode.name,
           actionType: 'transfer',
           operatorId: currentUser.id,
           operatorName: currentUser.name,

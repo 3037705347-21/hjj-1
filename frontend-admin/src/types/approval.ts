@@ -57,6 +57,9 @@ export interface ApprovalNode {
   actionTime?: string
   comment?: string
   isAutoApprove?: boolean
+  originalApproverId?: string
+  originalApproverName?: string
+  transferredAt?: string
 }
 
 export interface ApprovalHistoryRecord {

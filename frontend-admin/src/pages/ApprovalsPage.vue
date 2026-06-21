@@ -53,6 +53,7 @@ import type {
   TransferActionData,
   CcActionData,
   ApprovalNodeStatus,
+  ApprovalNode,
 } from '@/types/approval'
 import {
   approvalTypeLabels,
@@ -279,6 +280,20 @@ const totalPages = computed(() => {
   return Math.ceil(data.value.total / pagination.pageSize)
 })
 
+const currentNodeTransferInfo = computed(() => {
+  if (!currentApproval.value) return null
+  const currentNode = currentApproval.value.nodes.find(n => n.status === 'current')
+  if (currentNode?.originalApproverName) {
+    return {
+      from: currentNode.originalApproverName,
+      to: currentNode.approverName,
+      time: currentNode.transferredAt,
+      comment: currentNode.comment,
+    }
+  }
+  return null
+})
+
 const isCurrentUserApprover = (approval: ApprovalRecord) => {
   const currentUser = JSON.parse(localStorage.getItem('mock_user') || 'null')
   return approval.nodes.some(n => n.status === 'current' && n.approverId === currentUser?.id)
@@ -489,8 +504,11 @@ const getApprovalIcon = (type: ApprovalType) => {
   }
 }
 
-const getNodeIconClass = (status: ApprovalNodeStatus) => {
-  switch (status) {
+const getNodeIconClass = (node: ApprovalNode) => {
+  if (node.originalApproverName && node.status === 'current') {
+    return 'bg-orange-500 text-white animate-pulse'
+  }
+  switch (node.status) {
     case 'approved': return 'bg-success-500 text-white'
     case 'current': return 'bg-primary-500 text-white animate-pulse'
     case 'rejected': return 'bg-danger-500 text-white'
@@ -665,10 +683,19 @@ onMounted(() => {
               </td>
               <td class="px-6 py-4">
                 <div v-if="item.currentNodeName" class="flex items-center gap-2">
-                  <div class="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></div>
+                  <div
+                    class="w-2 h-2 rounded-full animate-pulse"
+                    :class="item.nodes?.some(n => n.status === 'current' && n.originalApproverName) ? 'bg-orange-500' : 'bg-primary-500'"
+                  ></div>
                   <div>
                     <p class="text-sm text-gray-700">{{ item.currentNodeName }}</p>
                     <p class="text-xs text-gray-400">{{ item.currentApproverName }}</p>
+                    <p
+                      v-if="item.nodes?.some(n => n.status === 'current' && n.originalApproverName)"
+                      class="text-xs text-orange-600"
+                    >
+                      转交待处理
+                    </p>
                   </div>
                 </div>
                 <span v-else class="text-sm text-gray-400">-</span>
@@ -839,16 +866,20 @@ onMounted(() => {
                     <div class="flex flex-col items-center" style="min-width: 100px;">
                       <div
                         class="w-10 h-10 rounded-full flex items-center justify-center z-10 transition-all"
-                        :class="getNodeIconClass(node.status)"
+                        :class="getNodeIconClass(node)"
                       >
                         <Check v-if="node.status === 'approved'" class="w-5 h-5" />
                         <XCircle v-else-if="node.status === 'rejected'" class="w-5 h-5" />
+                        <ArrowLeftRight v-else-if="node.originalApproverName && node.status === 'current'" class="w-5 h-5" />
                         <ArrowLeftRight v-else-if="node.status === 'transferred'" class="w-5 h-5" />
                         <Clock v-else-if="node.status === 'current'" class="w-5 h-5" />
                         <Circle v-else class="w-3 h-3" />
                       </div>
                       <p class="mt-2 text-sm font-medium text-gray-900 text-center">{{ node.name }}</p>
                       <p class="text-xs text-gray-500 text-center mt-0.5">{{ node.approverName }}</p>
+                      <p v-if="node.originalApproverName" class="text-xs text-orange-600 text-center mt-0.5">
+                        由 {{ node.originalApproverName }} 转交
+                      </p>
                       <p v-if="node.actionTime" class="text-xs text-gray-400 text-center">{{ node.actionTime?.slice(5, 16) }}</p>
                     </div>
                   </template>
@@ -875,6 +906,9 @@ onMounted(() => {
               <div class="p-4 bg-gray-50 rounded-xl">
                 <p class="text-xs text-gray-500 mb-1">当前审批人</p>
                 <p class="font-medium text-gray-900">{{ currentApproval.currentApproverName || '审批已完成' }}</p>
+                <p v-if="currentNodeTransferInfo" class="text-xs text-orange-600 mt-1">
+                  由 {{ currentNodeTransferInfo.from }} 转交
+                </p>
               </div>
             </div>
 
