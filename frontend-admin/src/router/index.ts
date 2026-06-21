@@ -17,6 +17,8 @@ import PurchaseDetailPage from '@/pages/PurchaseDetailPage.vue'
 import SuppliersPage from '@/pages/SuppliersPage.vue'
 import SupplierDetailPage from '@/pages/SupplierDetailPage.vue'
 import RequisitionsPage from '@/pages/RequisitionsPage.vue'
+import StockTakesPage from '@/pages/StockTakesPage.vue'
+import StockTakeDetailPage from '@/pages/StockTakeDetailPage.vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
 
@@ -129,6 +131,18 @@ const routes: RouteRecordRaw[] = [
         name: 'requisitions',
         component: RequisitionsPage,
         meta: { title: '实验领用', permissions: ['requisition:view'] },
+      },
+      {
+        path: 'stocktakes',
+        name: 'stocktakes',
+        component: StockTakesPage,
+        meta: { title: '库存盘点', permissions: ['stocktake:view'] },
+      },
+      {
+        path: 'stocktakes/:id',
+        name: 'stocktake-detail',
+        component: StockTakeDetailPage,
+        meta: { title: '盘点详情', permissions: ['stocktake:view'] },
       },
       {
         path: 'system-settings',

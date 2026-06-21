@@ -11,6 +11,7 @@ export type AuditModule =
   | 'purchase'
   | 'supplier'
   | 'requisition'
+  | 'stocktake'
 
 export type AuditOperationType =
   | 'login'
@@ -72,6 +73,16 @@ export type AuditOperationType =
   | 'requisition_outbound'
   | 'requisition_register'
   | 'requisition_cancel'
+  | 'start'
+  | 'confirm'
+  | 'count'
+  | 'stocktake_create'
+  | 'stocktake_edit'
+  | 'stocktake_delete'
+  | 'stocktake_start'
+  | 'stocktake_count'
+  | 'stocktake_confirm'
+  | 'stocktake_export'
 
 export interface AuditLog {
   id: string
@@ -112,6 +123,7 @@ export const auditModuleLabels: Record<AuditModule, string> = {
   purchase: '采购管理',
   supplier: '供应商管理',
   requisition: '实验领用',
+  stocktake: '库存盘点',
 }
 
 export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
@@ -174,6 +186,16 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   requisition_outbound: '领用出库',
   requisition_register: '使用登记',
   requisition_cancel: '取消领用',
+  start: '开始',
+  confirm: '确认',
+  count: '盘点',
+  stocktake_create: '创建盘点任务',
+  stocktake_edit: '编辑盘点任务',
+  stocktake_delete: '删除盘点任务',
+  stocktake_start: '开始盘点',
+  stocktake_count: '录入实盘',
+  stocktake_confirm: '确认盘点结果',
+  stocktake_export: '导出盘点报表',
 }
 
 export interface AuditLogFilterParams {
