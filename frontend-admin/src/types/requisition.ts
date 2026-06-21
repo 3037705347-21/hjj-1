@@ -13,6 +13,8 @@ export interface RequisitionItem {
   actualQuantity?: number
   stockBefore?: number
   stockAfter?: number
+  unitPrice?: number
+  totalCost?: number
 }
 
 export interface Requisition {
@@ -83,7 +85,9 @@ export interface ProjectConsumptionStat {
   totalQuantity: number
   reagentQuantity: number
   consumableQuantity: number
-  estimatedCost: number
+  totalCost: number
+  reagentCost: number
+  consumableCost: number
 }
 
 export interface TopicCostStat {
@@ -91,7 +95,7 @@ export interface TopicCostStat {
   topicName: string
   totalRequisitions: number
   totalQuantity: number
-  estimatedCost: number
+  totalCost: number
   reagentCost: number
   consumableCost: number
 }
@@ -104,6 +108,9 @@ export interface UserUsageStat {
   totalItems: number
   reagentCount: number
   consumableCount: number
+  totalCost: number
+  reagentCost: number
+  consumableCost: number
 }
 
 export const requisitionStatusLabels: Record<RequisitionStatus, string> = {

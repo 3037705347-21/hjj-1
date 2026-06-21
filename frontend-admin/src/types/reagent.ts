@@ -33,6 +33,7 @@ export interface Reagent {
   hazardLevel?: HazardLevel
   supplierIds?: string[]
   defaultSupplierId?: string
+  unitPrice?: number
   createdAt: string
   updatedAt: string
 }
@@ -62,6 +63,7 @@ export interface ReagentFormData {
   hazardLevel?: HazardLevel
   supplierIds?: string[]
   defaultSupplierId?: string
+  unitPrice?: number
 }
 
 export const hazardLevelLabels: Record<HazardLevel, string> = {

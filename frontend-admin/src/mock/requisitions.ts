@@ -27,6 +27,7 @@ import {
   getOperationsFromStorage as getConsumableOperations,
   saveOperationsToStorage as saveConsumableOperations,
 } from './consumables'
+import { mockGetAllReagents } from './reagents'
 
 const STORAGE_KEY = 'mock_requisitions'
 
@@ -431,7 +432,7 @@ export async function mockRejectRequisition(
 
 export async function mockOutboundRequisition(id: string): Promise<Requisition> {
   return new Promise(async (resolve, reject) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
         reject(new Error('用户未登录'))
@@ -455,6 +456,9 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
       const consumables = getConsumablesFromStorage()
       const batchOps = getBatchOperations()
       const consOps = getConsumableOperations()
+      const reagents = await mockGetAllReagents()
+      const reagentPriceMap = new Map(reagents.map((r) => [r.id, r.unitPrice || 0]))
+      const consumablePriceMap = new Map(consumables.map((c) => [c.id, c.unitPrice || 0]))
       const now = formatDate(new Date())
       const nowIso = new Date().toISOString()
       const errors: string[] = []
@@ -505,11 +509,14 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
           })
           saveBatchOperations(batchOps)
 
+          const unitPrice = reagentPriceMap.get(matchedBatch.reagentId) || 0
           updatedItems.push({
             ...item,
             actualQuantity: qty,
             stockBefore: beforeQty,
             stockAfter: afterQty,
+            unitPrice,
+            totalCost: Number((qty * unitPrice).toFixed(2)),
           })
         } else if (item.materialType === 'consumable') {
           const matchedCons = consumables.find((c) =>
@@ -550,11 +557,14 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
           })
           saveConsumableOperations(consOps)
 
+          const unitPrice = matchedCons.unitPrice || consumablePriceMap.get(matchedCons.id) || 0
           updatedItems.push({
             ...item,
             actualQuantity: qty,
             stockBefore: beforeQty,
             stockAfter: afterQty,
+            unitPrice,
+            totalCost: Number((qty * unitPrice).toFixed(2)),
           })
         }
       }
@@ -576,7 +586,7 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
       saveRequisitionsToStorage(records)
 
       const summary = updatedItems
-        .map((i) => `${i.materialName} ${i.stockBefore}→${i.stockAfter}${i.unit}`)
+        .map((i) => `${i.materialName} ${i.stockBefore}→${i.stockAfter}${i.unit} ¥${i.totalCost}`)
         .join(', ')
 
       addAuditLog({
@@ -726,25 +736,29 @@ export async function mockGetProjectConsumption(): Promise<ProjectConsumptionSta
             totalQuantity: 0,
             reagentQuantity: 0,
             consumableQuantity: 0,
-            estimatedCost: 0,
+            totalCost: 0,
+            reagentCost: 0,
+            consumableCost: 0,
           })
         }
         const stat = map.get(key)!
         r.items.forEach((item) => {
           stat.totalItems++
           const qty = item.actualQuantity || item.expectedQuantity
+          const cost = item.totalCost || (item.unitPrice ? qty * item.unitPrice : 0)
           stat.totalQuantity += qty
           if (item.materialType === 'reagent') {
             stat.reagentQuantity += qty
-            stat.estimatedCost += qty * 50
+            stat.reagentCost += cost
           } else {
             stat.consumableQuantity += qty
-            stat.estimatedCost += qty * 20
+            stat.consumableCost += cost
           }
+          stat.totalCost = stat.reagentCost + stat.consumableCost
         })
       })
 
-      resolve(Array.from(map.values()).sort((a, b) => b.estimatedCost - a.estimatedCost))
+      resolve(Array.from(map.values()).sort((a, b) => b.totalCost - a.totalCost))
     }, 200)
   })
 }
@@ -763,7 +777,7 @@ export async function mockGetTopicCost(): Promise<TopicCostStat[]> {
             topicName: r.topicName,
             totalRequisitions: 0,
             totalQuantity: 0,
-            estimatedCost: 0,
+            totalCost: 0,
             reagentCost: 0,
             consumableCost: 0,
           })
@@ -772,17 +786,18 @@ export async function mockGetTopicCost(): Promise<TopicCostStat[]> {
         stat.totalRequisitions++
         r.items.forEach((item) => {
           const qty = item.actualQuantity || item.expectedQuantity
+          const cost = item.totalCost || (item.unitPrice ? qty * item.unitPrice : 0)
           stat.totalQuantity += qty
           if (item.materialType === 'reagent') {
-            stat.reagentCost += qty * 50
+            stat.reagentCost += cost
           } else {
-            stat.consumableCost += qty * 20
+            stat.consumableCost += cost
           }
-          stat.estimatedCost = stat.reagentCost + stat.consumableCost
+          stat.totalCost = stat.reagentCost + stat.consumableCost
         })
       })
 
-      resolve(Array.from(map.values()).sort((a, b) => b.estimatedCost - a.estimatedCost))
+      resolve(Array.from(map.values()).sort((a, b) => b.totalCost - a.totalCost))
     }, 200)
   })
 }
@@ -790,7 +805,7 @@ export async function mockGetTopicCost(): Promise<TopicCostStat[]> {
 export async function mockGetUserUsage(): Promise<UserUsageStat[]> {
   return new Promise((resolve) => {
     setTimeout(() => {
-      const records = getRequisitionsFromStorage()
+      const records = getRequisitionsFromStorage().filter((r) => r.status === 'used' || r.status === 'outbound')
       const map = new Map<string, UserUsageStat>()
 
       records.forEach((r) => {
@@ -804,18 +819,29 @@ export async function mockGetUserUsage(): Promise<UserUsageStat[]> {
             totalItems: 0,
             reagentCount: 0,
             consumableCount: 0,
+            totalCost: 0,
+            reagentCost: 0,
+            consumableCost: 0,
           })
         }
         const stat = map.get(key)!
         stat.requisitionCount++
         r.items.forEach((item) => {
           stat.totalItems++
-          if (item.materialType === 'reagent') stat.reagentCount++
-          else stat.consumableCount++
+          const qty = item.actualQuantity || item.expectedQuantity
+          const cost = item.totalCost || (item.unitPrice ? qty * item.unitPrice : 0)
+          if (item.materialType === 'reagent') {
+            stat.reagentCount++
+            stat.reagentCost += cost
+          } else {
+            stat.consumableCount++
+            stat.consumableCost += cost
+          }
+          stat.totalCost = stat.reagentCost + stat.consumableCost
         })
       })
 
-      resolve(Array.from(map.values()).sort((a, b) => b.requisitionCount - a.requisitionCount))
+      resolve(Array.from(map.values()).sort((a, b) => b.totalCost - a.totalCost))
     }, 200)
   })
 }

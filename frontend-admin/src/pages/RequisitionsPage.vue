@@ -167,6 +167,7 @@ const showRegisterModal = ref(false)
 const registerQuantities = ref<Record<string, number>>({})
 
 const queryTab = ref<'list' | 'project' | 'topic' | 'user'>('list')
+const queryDrillDown = ref<{field: string; value: string; label: string} | null>(null)
 
 const statusFilterForTab = computed(() => {
   switch (activeTab.value) {
@@ -197,6 +198,11 @@ const fetchData = async () => {
       params.status = statusFilterForTab.value
     }
 
+    if (queryDrillDown.value) {
+      const key = queryDrillDown.value.field as keyof RequisitionFilterParams
+      ;(params as any)[key] = queryDrillDown.value.value
+    }
+
     const result = await mockGetRequisitions(pagination.page, pagination.pageSize, params)
     data.value = result
   } finally {
@@ -217,6 +223,7 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
+  queryDrillDown.value = null
   filters.value = {
     keyword: '',
     status: '',
@@ -264,6 +271,7 @@ const totalPages = computed(() => {
 const handleTabChange = (key: TabKey) => {
   activeTab.value = key
   pagination.page = 1
+  queryDrillDown.value = null
   filters.value = {
     keyword: '',
     status: '',
@@ -586,6 +594,21 @@ onMounted(() => {
         </div>
 
         <div v-if="queryTab === 'list' || activeTab !== 'query'">
+          <div
+            v-if="queryDrillDown"
+            class="mb-4 flex items-center gap-2 bg-primary-50 border border-primary-200 rounded-lg px-4 py-2.5"
+          >
+            <span class="text-sm text-primary-700">
+              已筛选: <span class="font-medium">{{ queryDrillDown.label }}</span>
+            </span>
+            <button
+              class="p-1 text-primary-500 hover:text-primary-700 hover:bg-primary-100 rounded transition-colors"
+              @click="queryDrillDown = null; fetchData()"
+            >
+              <X class="w-4 h-4" />
+            </button>
+          </div>
+
           <DataTableFilter
             v-model="filters"
             :filter-fields="filterFields"
@@ -628,7 +651,10 @@ onMounted(() => {
                     class="hover:bg-gray-50 transition-colors"
                   >
                     <td class="px-6 py-4">
-                      <span class="text-sm font-medium text-primary-600">{{ item.requestCode }}</span>
+                      <span
+                        class="text-sm font-medium text-primary-600 cursor-pointer hover:underline"
+                        @click="openDetail(item.id)"
+                      >{{ item.requestCode }}</span>
                     </td>
                     <td class="px-6 py-4">
                       <div class="text-sm text-gray-900">{{ item.projectName }}</div>
@@ -780,14 +806,17 @@ onMounted(() => {
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">总消耗量</th>
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">试剂消耗</th>
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">耗材消耗</th>
-                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">估算成本(元)</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">试剂成本(元)</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">耗材成本(元)</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">总成本(元)</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <tr
                   v-for="item in projectStats"
                   :key="item.projectCode"
-                  class="hover:bg-gray-50 transition-colors"
+                  class="hover:bg-gray-50 transition-colors cursor-pointer"
+                  @click="queryDrillDown = {field: 'projectName', value: item.projectName, label: item.projectName}; queryTab = 'list'"
                 >
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.projectName }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ item.projectCode }}</td>
@@ -795,7 +824,9 @@ onMounted(() => {
                   <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">{{ item.totalQuantity }}</td>
                   <td class="px-6 py-4 text-sm text-purple-600 text-right">{{ item.reagentQuantity }}</td>
                   <td class="px-6 py-4 text-sm text-blue-600 text-right">{{ item.consumableQuantity }}</td>
-                  <td class="px-6 py-4 text-sm font-bold text-primary-600 text-right">¥{{ item.estimatedCost.toLocaleString() }}</td>
+                  <td class="px-6 py-4 text-sm text-purple-600 text-right">¥{{ item.reagentCost.toLocaleString() }}</td>
+                  <td class="px-6 py-4 text-sm text-blue-600 text-right">¥{{ item.consumableCost.toLocaleString() }}</td>
+                  <td class="px-6 py-4 text-sm font-bold text-primary-600 text-right">¥{{ item.totalCost.toLocaleString() }}</td>
                 </tr>
               </tbody>
             </table>
@@ -816,14 +847,15 @@ onMounted(() => {
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">总消耗量</th>
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">试剂成本(元)</th>
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">耗材成本(元)</th>
-                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">估算总成本(元)</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">总成本(元)</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <tr
                   v-for="item in topicStats"
                   :key="item.topicCode"
-                  class="hover:bg-gray-50 transition-colors"
+                  class="hover:bg-gray-50 transition-colors cursor-pointer"
+                  @click="queryDrillDown = {field: 'topicCode', value: item.topicCode, label: item.topicName}; queryTab = 'list'"
                 >
                   <td class="px-6 py-4 text-sm text-gray-600">{{ item.topicCode }}</td>
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.topicName }}</td>
@@ -831,7 +863,7 @@ onMounted(() => {
                   <td class="px-6 py-4 text-sm font-medium text-gray-900 text-right">{{ item.totalQuantity }}</td>
                   <td class="px-6 py-4 text-sm text-purple-600 text-right">¥{{ item.reagentCost.toLocaleString() }}</td>
                   <td class="px-6 py-4 text-sm text-blue-600 text-right">¥{{ item.consumableCost.toLocaleString() }}</td>
-                  <td class="px-6 py-4 text-sm font-bold text-primary-600 text-right">¥{{ item.estimatedCost.toLocaleString() }}</td>
+                  <td class="px-6 py-4 text-sm font-bold text-primary-600 text-right">¥{{ item.totalCost.toLocaleString() }}</td>
                 </tr>
               </tbody>
             </table>
@@ -852,13 +884,17 @@ onMounted(() => {
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">物料项数</th>
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">试剂项</th>
                   <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">耗材项</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">试剂成本(元)</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">耗材成本(元)</th>
+                  <th class="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">总成本(元)</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-gray-100">
                 <tr
                   v-for="item in userStats"
                   :key="item.userId"
-                  class="hover:bg-gray-50 transition-colors"
+                  class="hover:bg-gray-50 transition-colors cursor-pointer"
+                  @click="queryDrillDown = {field: 'applicantName', value: item.userName, label: item.userName}; queryTab = 'list'"
                 >
                   <td class="px-6 py-4 text-sm font-medium text-gray-900">{{ item.userName }}</td>
                   <td class="px-6 py-4 text-sm text-gray-600">{{ item.department || '-' }}</td>
@@ -866,6 +902,9 @@ onMounted(() => {
                   <td class="px-6 py-4 text-sm text-gray-900 text-right">{{ item.totalItems }}</td>
                   <td class="px-6 py-4 text-sm text-purple-600 text-right">{{ item.reagentCount }}</td>
                   <td class="px-6 py-4 text-sm text-blue-600 text-right">{{ item.consumableCount }}</td>
+                  <td class="px-6 py-4 text-sm text-purple-600 text-right">¥{{ item.reagentCost.toLocaleString() }}</td>
+                  <td class="px-6 py-4 text-sm text-blue-600 text-right">¥{{ item.consumableCost.toLocaleString() }}</td>
+                  <td class="px-6 py-4 text-sm font-bold text-primary-600 text-right">¥{{ item.totalCost.toLocaleString() }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1167,6 +1206,10 @@ onMounted(() => {
                         class="mt-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded inline-block"
                       >
                         库存: {{ item.stockBefore }} → {{ item.stockAfter }} {{ item.unit }}
+                      </div>
+                      <div v-if="item.unitPrice !== undefined" class="text-xs text-amber-600">
+                        单价: ¥{{ item.unitPrice }}/{{ item.unit }}
+                        <span v-if="item.totalCost !== undefined" class="ml-2 font-medium">金额: ¥{{ item.totalCost.toLocaleString() }}</span>
                       </div>
                     </div>
                   </div>

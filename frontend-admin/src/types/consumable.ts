@@ -11,6 +11,7 @@ export interface Consumable {
   description?: string
   supplierIds?: string[]
   defaultSupplierId?: string
+  unitPrice?: number
   createdAt: string
   updatedAt: string
 }
