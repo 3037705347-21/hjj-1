@@ -150,6 +150,7 @@ const getModuleColor = (module: AuditModule): string => {
     system: 'bg-gray-100 text-gray-700',
     purchase: 'bg-orange-100 text-orange-700',
     supplier: 'bg-teal-100 text-teal-700',
+    requisition: 'bg-pink-100 text-pink-700',
   }
   return colors[module] || 'bg-gray-100 text-gray-700'
 }

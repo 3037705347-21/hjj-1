@@ -10,6 +10,7 @@ export type AuditModule =
   | 'system'
   | 'purchase'
   | 'supplier'
+  | 'requisition'
 
 export type AuditOperationType =
   | 'login'
@@ -62,6 +63,12 @@ export type AuditOperationType =
   | 'purchase_receive'
   | 'purchase_return'
   | 'purchase_order_complete'
+  | 'requisition_submit'
+  | 'requisition_approve'
+  | 'requisition_reject'
+  | 'requisition_outbound'
+  | 'requisition_register'
+  | 'requisition_cancel'
 
 export interface AuditLog {
   id: string
@@ -101,6 +108,7 @@ export const auditModuleLabels: Record<AuditModule, string> = {
   system: '系统配置',
   purchase: '采购管理',
   supplier: '供应商管理',
+  requisition: '实验领用',
 }
 
 export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
@@ -154,6 +162,12 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   purchase_receive: '到货登记',
   purchase_return: '采购退货',
   purchase_order_complete: '完成采购单',
+  requisition_submit: '提交领用申请',
+  requisition_approve: '审批通过领用',
+  requisition_reject: '审批驳回领用',
+  requisition_outbound: '领用出库',
+  requisition_register: '使用登记',
+  requisition_cancel: '取消领用',
 }
 
 export interface AuditLogFilterParams {

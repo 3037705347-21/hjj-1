@@ -11,6 +11,7 @@ export type ApprovalType =
   | 'consumable_adjust'
   | 'system_config'
   | 'alert_rule'
+  | 'requisition_apply'
 
 export type ApprovalStatus = 'pending' | 'approved' | 'rejected'
 
@@ -70,6 +71,7 @@ export const approvalTypeLabels: Record<ApprovalType, string> = {
   consumable_adjust: '耗材库存调整',
   system_config: '系统配置修改',
   alert_rule: '预警规则修改',
+  requisition_apply: '实验领用申请',
 }
 
 export const approvalStatusLabels: Record<ApprovalStatus, string> = {

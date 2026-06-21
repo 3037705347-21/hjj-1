@@ -50,6 +50,12 @@ export type PermissionCode =
   | 'supplier:delete'
   | 'supplier:qualification:manage'
   | 'supplier:evaluation:view'
+  | 'requisition:view'
+  | 'requisition:create'
+  | 'requisition:approve'
+  | 'requisition:outbound'
+  | 'requisition:register'
+  | 'requisition:statistics'
 
 export type DataScope = 'all' | 'lab' | 'department' | 'group' | 'self'
 
@@ -109,6 +115,12 @@ export const permissionLabels: Record<PermissionCode, string> = {
   'supplier:delete': '删除供应商',
   'supplier:qualification:manage': '管理资质附件',
   'supplier:evaluation:view': '查看供应商评价',
+  'requisition:view': '查看领用记录',
+  'requisition:create': '创建领用申请',
+  'requisition:approve': '审批领用申请',
+  'requisition:outbound': '领用出库',
+  'requisition:register': '使用登记',
+  'requisition:statistics': '消耗统计',
 }
 
 export const dataScopeLabels: Record<DataScope, string> = {
@@ -170,6 +182,12 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'supplier:delete',
     'supplier:qualification:manage',
     'supplier:evaluation:view',
+    'requisition:view',
+    'requisition:create',
+    'requisition:approve',
+    'requisition:outbound',
+    'requisition:register',
+    'requisition:statistics',
   ],
   lab_manager: [
     'dashboard:view',
@@ -215,6 +233,12 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'supplier:delete',
     'supplier:qualification:manage',
     'supplier:evaluation:view',
+    'requisition:view',
+    'requisition:create',
+    'requisition:approve',
+    'requisition:outbound',
+    'requisition:register',
+    'requisition:statistics',
   ],
   lab_staff: [
     'dashboard:view',
@@ -231,6 +255,9 @@ export const rolePermissions: Record<UserRole, PermissionCode[]> = {
     'purchase:request:edit',
     'purchase:request:submit',
     'supplier:view',
+    'requisition:view',
+    'requisition:create',
+    'requisition:register',
   ],
 }
 

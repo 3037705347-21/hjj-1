@@ -16,6 +16,7 @@ import PurchaseOrdersPage from '@/pages/PurchaseOrdersPage.vue'
 import PurchaseDetailPage from '@/pages/PurchaseDetailPage.vue'
 import SuppliersPage from '@/pages/SuppliersPage.vue'
 import SupplierDetailPage from '@/pages/SupplierDetailPage.vue'
+import RequisitionsPage from '@/pages/RequisitionsPage.vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
 
@@ -122,6 +123,12 @@ const routes: RouteRecordRaw[] = [
         name: 'supplier-detail',
         component: SupplierDetailPage,
         meta: { title: '供应商详情', permissions: ['supplier:view'] },
+      },
+      {
+        path: 'requisitions',
+        name: 'requisitions',
+        component: RequisitionsPage,
+        meta: { title: '实验领用', permissions: ['requisition:view'] },
       },
       {
         path: 'system-settings',

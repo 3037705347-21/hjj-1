@@ -81,6 +81,13 @@ export function usePermission() {
   const canViewSupplierEvaluation = computed(() => hasPermission('supplier:evaluation:view'))
   const canManageSupplier = computed(() => hasAnyPermission(['supplier:create', 'supplier:edit', 'supplier:delete']))
 
+  const canViewRequisitions = computed(() => hasPermission('requisition:view'))
+  const canCreateRequisition = computed(() => hasPermission('requisition:create'))
+  const canApproveRequisition = computed(() => hasPermission('requisition:approve'))
+  const canOutboundRequisition = computed(() => hasPermission('requisition:outbound'))
+  const canRegisterRequisition = computed(() => hasPermission('requisition:register'))
+  const canViewRequisitionStats = computed(() => hasPermission('requisition:statistics'))
+
   return {
     hasPermission,
     hasAnyPermission,
@@ -130,5 +137,11 @@ export function usePermission() {
     canManageSupplierQualification,
     canViewSupplierEvaluation,
     canManageSupplier,
+    canViewRequisitions,
+    canCreateRequisition,
+    canApproveRequisition,
+    canOutboundRequisition,
+    canRegisterRequisition,
+    canViewRequisitionStats,
   }
 }
