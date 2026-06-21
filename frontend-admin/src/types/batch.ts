@@ -47,6 +47,7 @@ export interface BatchOperation {
   reason?: string
   remark?: string
   targetLocation?: string
+  targetLocationId?: string
   newExpiryDate?: string
   createdAt: string
 }
@@ -74,6 +75,7 @@ export interface BatchOperationFormData {
   reason?: string
   remark?: string
   targetLocation?: string
+  targetLocationId?: string
   newExpiryDate?: string
 }
 

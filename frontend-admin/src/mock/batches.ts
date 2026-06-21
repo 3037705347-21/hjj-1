@@ -627,6 +627,7 @@ export function mockBatchOperation(
       const user = getCurrentUser()
       const beforeQuantity = batch.remainingQuantity
       let afterQuantity = beforeQuantity
+      let newTransferredBatch: ReagentBatch | null = null
 
       const validateQuantity = () => {
         if (data.quantity === undefined || data.quantity <= 0) {
@@ -659,9 +660,30 @@ export function mockBatchOperation(
             if (batch.status === 'exhausted') throw new Error('批次已耗尽，无法调拨')
             validateQuantity()
             if (data.quantity! > beforeQuantity) throw new Error('调拨数量不能超过库存')
-            if (!data.targetLocation?.trim()) throw new Error('请输入目标存放位置')
+            if (!data.targetLocation?.trim()) throw new Error('请选择目标库位')
             afterQuantity = Number((beforeQuantity - data.quantity!).toFixed(2))
             batch.remainingQuantity = afterQuantity
+            if (data.quantity! === beforeQuantity) {
+              batch.storageLocation = data.targetLocation
+              batch.locationId = data.targetLocationId
+            } else {
+              newTransferredBatch = updateBatchStatus({
+                id: generateId(),
+                reagentId: batch.reagentId,
+                reagentName: batch.reagentName,
+                batchNumber: batch.batchNumber,
+                productionDate: batch.productionDate,
+                expiryDate: batch.expiryDate,
+                initialQuantity: data.quantity!,
+                remainingQuantity: data.quantity!,
+                unit: batch.unit,
+                storageLocation: data.targetLocation,
+                locationId: data.targetLocationId,
+                receivedDate: new Date().toISOString().split('T')[0],
+                status: 'normal',
+                remark: `调拨拆分自批次 ${batch.id}`,
+              })
+            }
             break
 
           case 'stock_in':
@@ -725,6 +747,9 @@ export function mockBatchOperation(
       }
 
       batches[index] = batch.status !== 'frozen' ? updateBatchStatus(batch) : batch
+      if (newTransferredBatch) {
+        batches.unshift(newTransferredBatch)
+      }
       saveBatchesToStorage(batches)
 
       const operation: BatchOperation = {
@@ -739,15 +764,38 @@ export function mockBatchOperation(
         reason: data.reason,
         remark: data.remark,
         targetLocation: data.targetLocation,
+        targetLocationId: data.targetLocationId,
         newExpiryDate: data.newExpiryDate,
         createdAt: new Date().toISOString(),
       }
 
       const operations = getOperationsFromStorage()
       operations.unshift(operation)
+      if (newTransferredBatch) {
+        operations.unshift({
+          id: generateId(),
+          batchId: newTransferredBatch.id,
+          type: 'in',
+          quantity: newTransferredBatch.initialQuantity,
+          beforeQuantity: 0,
+          afterQuantity: newTransferredBatch.initialQuantity,
+          operator: user?.id || '3',
+          operatorName: user?.name || '王实验员',
+          purpose: '调拨入库',
+          reason: `调拨自批次 ${batch.id}`,
+          remark: data.remark,
+          targetLocation: data.targetLocation,
+          targetLocationId: data.targetLocationId,
+          createdAt: new Date().toISOString(),
+        })
+      }
       saveOperationsToStorage(operations)
 
       addAuditLog({ module: 'batch', operationType: data.type, targetType: 'batch', targetId: id, targetName: batches[index].batchNumber, beforeContent: `库存: ${beforeQuantity} ${batches[index].unit || ''}`, afterContent: `库存: ${afterQuantity} ${batches[index].unit || ''}`, remark: data.reason || '' })
+
+      if (newTransferredBatch) {
+        addAuditLog({ module: 'batch', operationType: 'inbound', targetType: 'batch', targetId: newTransferredBatch.id, targetName: newTransferredBatch.batchNumber, beforeContent: `库存: 0 ${newTransferredBatch.unit || ''}`, afterContent: `库存: ${newTransferredBatch.initialQuantity} ${newTransferredBatch.unit || ''}`, remark: `调拨入库，来自批次 ${batch.id}` })
+      }
 
       resolve(operation)
     }, 300)
@@ -820,7 +868,7 @@ export function mockBatchDeleteBatches(ids: string[]): Promise<void> {
   })
 }
 
-export function mockBatchUpdateBatchLocation(ids: string[], storageLocation: string): Promise<void> {
+export function mockBatchUpdateBatchLocation(ids: string[], storageLocation: string, locationId?: string): Promise<void> {
   return new Promise((resolve) => {
     setTimeout(() => {
       const batches = getBatchesFromStorage()
@@ -841,10 +889,11 @@ export function mockBatchUpdateBatchLocation(ids: string[], storageLocation: str
             reason: '批量调拨',
             remark: '',
             targetLocation: storageLocation,
+            targetLocationId: locationId,
             createdAt: new Date().toISOString(),
           }
           operations.unshift(operation)
-          return { ...b, storageLocation }
+          return { ...b, storageLocation, locationId }
         }
         return b
       })

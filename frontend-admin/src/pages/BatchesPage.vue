@@ -229,7 +229,7 @@ const handleBatchEditLocationConfirm = (locId: string, location?: StorageLocatio
   batchEditLocationId.value = locId
   if (location) {
     showBatchEditDialog.value = false
-    handleBatchEditConfirm({ storageLocation: location.code })
+    handleBatchEditConfirm({ storageLocation: location.code, locationId: locId })
   }
   showLocationSelector.value = false
 }
@@ -382,7 +382,7 @@ const handleBatchEditConfirm = async (values: Record<string, any>) => {
   batchEditLoading.value = true
   try {
     if (batchEditType.value === 'location') {
-      await mockBatchUpdateBatchLocation(selectedIds.value, values.storageLocation)
+      await mockBatchUpdateBatchLocation(selectedIds.value, values.storageLocation, values.locationId)
     }
     showBatchEditDialog.value = false
     clearSelection()

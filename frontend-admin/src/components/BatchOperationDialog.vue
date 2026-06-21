@@ -186,6 +186,7 @@ const handleSubmit = async () => {
       reason: form.reason || undefined,
       remark: form.remark || undefined,
       targetLocation: form.targetLocation || undefined,
+      targetLocationId: targetLocationId.value || undefined,
       newExpiryDate: form.newExpiryDate || undefined,
     })
     close()
