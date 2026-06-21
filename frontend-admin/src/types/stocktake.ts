@@ -16,6 +16,7 @@ export interface StockTakeItem {
   specification?: string
   batchNumber?: string
   storageLocation: string
+  locationId?: string
   unit: string
   bookQuantity: number
   actualQuantity: number | null
@@ -88,6 +89,7 @@ export interface StockAdjustmentRecord {
   itemType: StockTakeItemType
   batchNumber?: string
   storageLocation: string
+  locationId?: string
   unit: string
   adjustType: 'surplus' | 'deficit'
   adjustQuantity: number

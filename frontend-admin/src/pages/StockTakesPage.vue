@@ -22,11 +22,13 @@ import {
   ChevronRight,
   X,
   Filter,
+  MapPin,
 } from 'lucide-vue-next'
 import DataTableFilter from '@/components/DataTableFilter.vue'
 import type { FilterField } from '@/components/DataTableFilter.vue'
 import { useSavedFilters } from '@/composables/useSavedFilters'
 import type { SavedFilter } from '@/composables/useSavedFilters'
+import LocationSelector from '@/components/LocationSelector.vue'
 import {
   mockGetStockTakes,
   mockCreateStockTake,
@@ -156,8 +158,9 @@ const categoryOptions = computed(() => {
 
 const reagentOptions = ref<{ label: string; value: string }[]>([])
 const consumableOptions = ref<{ label: string; value: string }[]>([])
-const locationOptions = ref<{ label: string; value: string }[]>([])
 const batchOptions = ref<{ label: string; value: string }[]>([])
+const showLocationSelector = ref(false)
+const selectedLocationLabel = ref('')
 
 const loadDimensionOptions = async () => {
   const reagents = await mockGetAllReagents()
@@ -167,20 +170,16 @@ const loadDimensionOptions = async () => {
   consumableOptions.value = consumables.map(c => ({ label: c.name, value: c.id }))
 
   const batches = getBatchesFromStorage()
-  const locations = new Set<string>()
-  batches.forEach(b => {
-    const loc = b.storageLocation.split('-').slice(0, 2).join('-')
-    if (loc) locations.add(loc)
-  })
-  consumables.forEach(c => {
-    if (c.location) {
-      const loc = c.location.split('-').slice(0, 2).join('-')
-      if (loc) locations.add(loc)
-    }
-  })
-  locationOptions.value = Array.from(locations).map(l => ({ label: l, value: l }))
-
   batchOptions.value = batches.map(b => ({ label: `${b.batchNumber} (${b.reagentName})`, value: b.id }))
+}
+
+const handleFormLocationConfirm = (locId: string, location?: any) => {
+  formData.dimensionValue = locId
+  selectedLocationLabel.value = location ? `${location.code} ${location.name}` : ''
+}
+
+const openFormLocationSelector = () => {
+  showLocationSelector.value = true
 }
 
 const selectedIds = ref<string[]>([])
@@ -268,6 +267,7 @@ const openCreateModal = async () => {
     assigneeName: '',
     remark: '',
   })
+  selectedLocationLabel.value = ''
   await loadDimensionOptions()
   showFormModal.value = true
 }
@@ -288,6 +288,7 @@ const openEditModal = async (item: StockTake) => {
     assigneeName: item.assigneeName || '',
     remark: item.remark || '',
   })
+  selectedLocationLabel.value = item.dimensionValueLabel || ''
   await loadDimensionOptions()
   showFormModal.value = true
 }
@@ -297,8 +298,8 @@ const handleFormSubmit = async () => {
     alert('请输入盘点标题')
     return
   }
-  if (!formData.dimensionValue?.trim() && formData.dimension !== 'location') {
-    alert('请输入盘点维度值')
+  if (!formData.dimensionValue?.trim()) {
+    alert('请选择盘点维度值')
     return
   }
 
@@ -739,14 +740,31 @@ onMounted(() => {
             </label>
             <select
               v-if="formData.dimension === 'location'"
-              v-model="formData.dimensionValue"
-              class="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all"
+              style="display: none"
+            ></select>
+            <div
+              v-if="formData.dimension === 'location'"
+              class="flex items-center gap-2"
             >
-              <option value="">请选择库位</option>
-              <option v-for="opt in locationOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
+              <button
+                type="button"
+                class="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg text-left hover:border-primary-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all flex items-center gap-2"
+                @click="openFormLocationSelector"
+              >
+                <MapPin class="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <span v-if="selectedLocationLabel" class="text-gray-900 truncate">{{ selectedLocationLabel }}</span>
+                <span v-else class="text-gray-400">请选择库位（含所有子库位）</span>
+              </button>
+              <button
+                v-if="formData.dimensionValue"
+                type="button"
+                class="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                title="清除选择"
+                @click="formData.dimensionValue = ''; selectedLocationLabel = ''"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
             <select
               v-else-if="formData.dimension === 'category'"
               v-model="formData.dimensionValue"
@@ -849,6 +867,13 @@ onMounted(() => {
       confirm-type="danger"
       :loading="deletingLoading"
       @confirm="confirmDelete"
+    />
+
+    <LocationSelector
+      v-model:visible="showLocationSelector"
+      :model-value="formData.dimensionValue"
+      :only-enabled="true"
+      @confirm="handleFormLocationConfirm"
     />
   </div>
 </template>

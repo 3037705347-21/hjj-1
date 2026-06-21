@@ -17,6 +17,7 @@ import { addAuditLog } from './audit'
 import { getBatchesFromStorage, saveBatchesToStorage, getOperationsFromStorage as getBatchOperationsFromStorage, saveOperationsToStorage as saveBatchOperationsToStorage } from './batches'
 import { mockGetAllReagents } from './reagents'
 import { getConsumablesFromStorage, saveConsumablesToStorage, getOperationsFromStorage as getConsumableOperationsFromStorage, saveOperationsToStorage as saveConsumableOperationsToStorage } from './consumables'
+import { getLocationsFromStorage, getLocationDescendants } from './locations'
 
 const STOCKTAKE_STORAGE_KEY = 'mock_stocktakes'
 const ADJUSTMENT_STORAGE_KEY = 'mock_stock_adjustments'
@@ -76,8 +77,8 @@ function initMockStockTakes(): StockTake[] {
     stockTakeNo: generateStockTakeNo(),
     title: 'A区库位月度盘点',
     dimension: 'location',
-    dimensionValue: 'A-01',
-    dimensionValueLabel: 'A区-01货架',
+    dimensionValue: 'loc_wh_01',
+    dimensionValueLabel: 'WH-A 总仓库',
     itemType: 'reagent',
     status: 'completed',
     totalItems: 5,
@@ -132,8 +133,8 @@ function initMockStockTakes(): StockTake[] {
     stockTakeNo: generateStockTakeNo(),
     title: 'B区库位盘点',
     dimension: 'location',
-    dimensionValue: 'B-02',
-    dimensionValueLabel: 'B区-02货架',
+    dimensionValue: 'loc_wh_02',
+    dimensionValueLabel: 'WH-B 试剂库',
     itemType: 'all',
     status: 'in_progress',
     totalItems: 8,
@@ -157,8 +158,8 @@ function initMockStockTakes(): StockTake[] {
     stockTakeNo: generateStockTakeNo(),
     title: '下半月盘点计划',
     dimension: 'location',
-    dimensionValue: 'C-01',
-    dimensionValueLabel: 'C区-01货架',
+    dimensionValue: 'loc_wh_03',
+    dimensionValueLabel: 'WH-C 耗材库',
     itemType: 'reagent',
     status: 'pending',
     totalItems: 0,
@@ -190,12 +191,21 @@ async function generateStockTakeItems(
   const consumables = getConsumablesFromStorage()
   const reagents = await mockGetAllReagents()
   const reagentMap = new Map(reagents.map(r => [r.id, r]))
+  const allLocations = getLocationsFromStorage()
+
+  let validLocationIds: Set<string> | null = null
+  if (dimension === 'location' && dimensionValue) {
+    validLocationIds = new Set<string>()
+    const descendants = getLocationDescendants(allLocations, dimensionValue)
+    descendants.forEach(loc => validLocationIds!.add(loc.id))
+    validLocationIds.add(dimensionValue)
+  }
 
   if (itemType === 'reagent' || itemType === 'all') {
     let filteredBatches = [...batches]
 
-    if (dimension === 'location' && dimensionValue) {
-      filteredBatches = filteredBatches.filter(b => b.storageLocation.startsWith(dimensionValue))
+    if (dimension === 'location' && validLocationIds) {
+      filteredBatches = filteredBatches.filter(b => b.locationId && validLocationIds.has(b.locationId))
     } else if (dimension === 'category' && dimensionValue) {
       filteredBatches = filteredBatches.filter(b => {
         const reagent = reagentMap.get(b.reagentId)
@@ -219,6 +229,7 @@ async function generateStockTakeItems(
         specification: reagent?.specification,
         batchNumber: batch.batchNumber,
         storageLocation: batch.storageLocation,
+        locationId: batch.locationId,
         unit: batch.unit || reagent?.unit || '',
         bookQuantity: batch.remainingQuantity,
         actualQuantity: null,
@@ -232,8 +243,8 @@ async function generateStockTakeItems(
   if (itemType === 'consumable' || itemType === 'all') {
     let filteredConsumables = [...consumables]
 
-    if (dimension === 'location' && dimensionValue) {
-      filteredConsumables = filteredConsumables.filter(c => c.location?.startsWith(dimensionValue))
+    if (dimension === 'location' && validLocationIds) {
+      filteredConsumables = filteredConsumables.filter(c => c.locationId && validLocationIds.has(c.locationId))
     } else if (dimension === 'category' && dimensionValue) {
       filteredConsumables = filteredConsumables.filter(c => c.category === dimensionValue)
     } else if (dimension === 'consumable' && dimensionValue) {
@@ -250,6 +261,7 @@ async function generateStockTakeItems(
         category: consumable.category,
         specification: consumable.specification,
         storageLocation: consumable.location || '',
+        locationId: consumable.locationId,
         unit: consumable.unit,
         bookQuantity: consumable.stockQuantity,
         actualQuantity: null,
@@ -424,7 +436,11 @@ export async function mockCreateStockTake(data: StockTakeFormData): Promise<Stoc
       }
 
       let dimensionValueLabel = data.dimensionValue
-      if (data.dimension === 'reagent' && data.dimensionValue) {
+      if (data.dimension === 'location' && data.dimensionValue) {
+        const locations = getLocationsFromStorage()
+        const loc = locations.find(l => l.id === data.dimensionValue)
+        dimensionValueLabel = loc ? `${loc.code} ${loc.name}` : data.dimensionValue
+      } else if (data.dimension === 'reagent' && data.dimensionValue) {
         const reagents = await mockGetAllReagents()
         const reagent = reagents.find(r => r.id === data.dimensionValue)
         dimensionValueLabel = reagent?.name || data.dimensionValue
@@ -806,6 +822,7 @@ export async function mockConfirmStockTake(
               itemType: item.itemType,
               batchNumber: item.batchNumber,
               storageLocation: item.storageLocation,
+              locationId: item.locationId,
               unit: item.unit,
               adjustType: 'surplus',
               adjustQuantity: Math.abs(item.difference),
@@ -875,6 +892,7 @@ export async function mockConfirmStockTake(
               itemType: item.itemType,
               batchNumber: item.batchNumber,
               storageLocation: item.storageLocation,
+              locationId: item.locationId,
               unit: item.unit,
               adjustType: 'deficit',
               adjustQuantity: Math.abs(item.difference),
