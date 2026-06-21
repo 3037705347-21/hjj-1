@@ -48,6 +48,9 @@ export type AuditOperationType =
   | 'approval_submit'
   | 'approval_approve'
   | 'approval_reject'
+  | 'approval_transfer'
+  | 'approval_cc'
+  | 'approval_withdraw'
   | 'in'
   | 'out'
   | 'receive'
@@ -149,6 +152,9 @@ export const auditOperationTypeLabels: Record<AuditOperationType, string> = {
   approval_submit: '提交审批',
   approval_approve: '审批通过',
   approval_reject: '审批驳回',
+  approval_transfer: '审批转交',
+  approval_cc: '审批抄送',
+  approval_withdraw: '撤回审批',
   receive: '采购入库',
   purchase_request_create: '创建采购申请',
   purchase_request_edit: '编辑采购申请',

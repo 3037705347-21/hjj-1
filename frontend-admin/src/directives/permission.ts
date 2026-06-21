@@ -1,6 +1,7 @@
 import type { Directive, DirectiveBinding } from 'vue'
 import { getUserStore } from '@/stores/user'
 import type { PermissionCode } from '@/types/permission'
+import type { UserRole } from '@/types/user'
 
 type PermissionValue = PermissionCode | PermissionCode[] | {
   permission: PermissionCode | PermissionCode[]
@@ -51,17 +52,17 @@ function checkPermission(el: HTMLElement, binding: DirectiveBinding<PermissionVa
 }
 
 export const vRole: Directive = {
-  mounted(el: HTMLElement, binding: DirectiveBinding<'admin' | 'lab_manager' | 'lab_staff' | Array<'admin' | 'lab_manager' | 'lab_staff'>>) {
+  mounted(el: HTMLElement, binding: DirectiveBinding<UserRole | UserRole[]>) {
     checkRole(el, binding)
   },
-  updated(el: HTMLElement, binding: DirectiveBinding<'admin' | 'lab_manager' | 'lab_staff' | Array<'admin' | 'lab_manager' | 'lab_staff'>>) {
+  updated(el: HTMLElement, binding: DirectiveBinding<UserRole | UserRole[]>) {
     if (binding.oldValue !== binding.value) {
       checkRole(el, binding)
     }
   },
 }
 
-function checkRole(el: HTMLElement, binding: DirectiveBinding<'admin' | 'lab_manager' | 'lab_staff' | Array<'admin' | 'lab_manager' | 'lab_staff'>>) {
+function checkRole(el: HTMLElement, binding: DirectiveBinding<UserRole | UserRole[]>) {
   const userStore = getUserStore()
   const value = binding.value
 
