@@ -28,7 +28,7 @@ export function getConsumablesFromStorage(): Consumable[] {
   return initMockConsumables()
 }
 
-function saveConsumablesToStorage(consumables: Consumable[]): void {
+export function saveConsumablesToStorage(consumables: Consumable[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(consumables))
 }
 
@@ -44,7 +44,7 @@ export function getOperationsFromStorage(): ConsumableOperation[] {
   return initMockOperations()
 }
 
-function saveOperationsToStorage(operations: ConsumableOperation[]): void {
+export function saveOperationsToStorage(operations: ConsumableOperation[]): void {
   localStorage.setItem(OPERATION_STORAGE_KEY, JSON.stringify(operations))
 }
 

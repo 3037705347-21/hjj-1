@@ -28,7 +28,7 @@ export function getBatchesFromStorage(): ReagentBatch[] {
   return initMockBatches()
 }
 
-function saveBatchesToStorage(batches: ReagentBatch[]): void {
+export function saveBatchesToStorage(batches: ReagentBatch[]): void {
   localStorage.setItem(BATCH_STORAGE_KEY, JSON.stringify(batches))
 }
 
@@ -44,7 +44,7 @@ export function getOperationsFromStorage(): BatchOperation[] {
   return []
 }
 
-function saveOperationsToStorage(operations: BatchOperation[]): void {
+export function saveOperationsToStorage(operations: BatchOperation[]): void {
   localStorage.setItem(OPERATION_STORAGE_KEY, JSON.stringify(operations))
 }
 

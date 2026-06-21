@@ -1162,6 +1162,12 @@ onMounted(() => {
                       <div v-if="item.actualQuantity !== undefined" class="text-xs text-primary-600">
                         实际: <span class="font-medium">{{ item.actualQuantity }}</span> {{ item.unit }}
                       </div>
+                      <div
+                        v-if="item.stockBefore !== undefined && item.stockAfter !== undefined"
+                        class="mt-1 text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded inline-block"
+                      >
+                        库存: {{ item.stockBefore }} → {{ item.stockAfter }} {{ item.unit }}
+                      </div>
                     </div>
                   </div>
                 </div>

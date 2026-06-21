@@ -14,6 +14,19 @@ import { generateId, formatDate } from '@/utils/date'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
 import { addAuditLog } from './audit'
+import {
+  getBatchesFromStorage,
+  saveBatchesToStorage,
+  updateBatchStatus,
+  getOperationsFromStorage as getBatchOperations,
+  saveOperationsToStorage as saveBatchOperations,
+} from './batches'
+import {
+  getConsumablesFromStorage,
+  saveConsumablesToStorage,
+  getOperationsFromStorage as getConsumableOperations,
+  saveOperationsToStorage as saveConsumableOperations,
+} from './consumables'
 
 const STORAGE_KEY = 'mock_requisitions'
 
@@ -417,7 +430,7 @@ export async function mockRejectRequisition(
 }
 
 export async function mockOutboundRequisition(id: string): Promise<Requisition> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     setTimeout(() => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
@@ -432,12 +445,124 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
         return
       }
 
-      const now = formatDate(new Date())
       const req = records[index]
-      const updatedItems = req.items.map((item) => ({
-        ...item,
-        actualQuantity: item.expectedQuantity,
-      }))
+      if (req.status !== 'approved') {
+        reject(new Error('只有已通过审批的领用记录才能出库'))
+        return
+      }
+
+      const batches = getBatchesFromStorage()
+      const consumables = getConsumablesFromStorage()
+      const batchOps = getBatchOperations()
+      const consOps = getConsumableOperations()
+      const now = formatDate(new Date())
+      const nowIso = new Date().toISOString()
+      const errors: string[] = []
+
+      const updatedItems: RequisitionItem[] = []
+
+      for (const item of req.items) {
+        const qty = item.expectedQuantity
+
+        if (item.materialType === 'reagent') {
+          const matchedBatch = batches
+            .filter((b) => {
+              const nameMatch = b.reagentId === item.materialId ||
+                (item.materialName && (b.reagentName === item.materialName))
+              return nameMatch && b.status !== 'expired' && b.status !== 'exhausted' && b.status !== 'frozen'
+            })
+            .sort((a, b) => b.remainingQuantity - a.remainingQuantity)[0]
+
+          if (!matchedBatch) {
+            errors.push(`试剂「${item.materialName}」没有可用批次`)
+            continue
+          }
+          if (matchedBatch.remainingQuantity < qty) {
+            errors.push(`试剂「${item.materialName}」批次(批次号:${matchedBatch.batchNumber})库存不足: 当前${matchedBatch.remainingQuantity}${matchedBatch.unit}，需要${qty}${matchedBatch.unit}`)
+            continue
+          }
+
+          const beforeQty = matchedBatch.remainingQuantity
+          const afterQty = Number((beforeQty - qty).toFixed(2))
+          const batchIdx = batches.findIndex((b) => b.id === matchedBatch.id)
+          batches[batchIdx] = updateBatchStatus({
+            ...matchedBatch,
+            remainingQuantity: afterQty,
+          })
+          saveBatchesToStorage(batches)
+
+          batchOps.unshift({
+            id: generateId(),
+            batchId: matchedBatch.id,
+            type: 'out',
+            quantity: qty,
+            beforeQuantity: beforeQty,
+            afterQuantity: afterQty,
+            operator: currentUser.id,
+            operatorName: currentUser.name,
+            purpose: `实验领用出库 ${req.requestCode} | 项目:${req.projectName} 课题:${req.topicName}`,
+            createdAt: nowIso,
+          })
+          saveBatchOperations(batchOps)
+
+          updatedItems.push({
+            ...item,
+            actualQuantity: qty,
+            stockBefore: beforeQty,
+            stockAfter: afterQty,
+          })
+        } else if (item.materialType === 'consumable') {
+          const matchedCons = consumables.find((c) =>
+            c.id === item.materialId ||
+            (item.materialName && (c.name === item.materialName))
+          )
+          if (!matchedCons) {
+            errors.push(`耗材「${item.materialName}」不存在`)
+            continue
+          }
+          if (matchedCons.stockQuantity < qty) {
+            errors.push(`耗材「${item.materialName}」库存不足: 当前${matchedCons.stockQuantity}${matchedCons.unit}，需要${qty}${matchedCons.unit}`)
+            continue
+          }
+
+          const beforeQty = matchedCons.stockQuantity
+          const afterQty = Number((beforeQty - qty).toFixed(2))
+          const consIdx = consumables.findIndex((c) => c.id === matchedCons.id)
+          consumables[consIdx] = {
+            ...matchedCons,
+            stockQuantity: afterQty,
+            updatedAt: nowIso,
+          }
+          saveConsumablesToStorage(consumables)
+
+          consOps.unshift({
+            id: generateId(),
+            consumableId: matchedCons.id,
+            consumableName: matchedCons.name,
+            type: 'stock_out',
+            quantity: qty,
+            beforeQuantity: beforeQty,
+            afterQuantity: afterQty,
+            operator: currentUser.id,
+            operatorName: currentUser.name,
+            purpose: `实验领用出库 ${req.requestCode} | 项目:${req.projectName} 课题:${req.topicName}`,
+            createdAt: nowIso,
+          })
+          saveConsumableOperations(consOps)
+
+          updatedItems.push({
+            ...item,
+            actualQuantity: qty,
+            stockBefore: beforeQty,
+            stockAfter: afterQty,
+          })
+        }
+      }
+
+      if (errors.length > 0) {
+        reject(new Error(errors.join('\n')))
+        return
+      }
 
       records[index] = {
         ...req,
@@ -450,15 +575,19 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
       }
       saveRequisitionsToStorage(records)
 
+      const summary = updatedItems
+        .map((i) => `${i.materialName} ${i.stockBefore}→${i.stockAfter}${i.unit}`)
+        .join(', ')
+
       addAuditLog({
         module: 'requisition',
         operationType: 'requisition_outbound',
         targetType: 'requisition',
         targetId: id,
         targetName: records[index].requestCode,
-        beforeContent: '状态: 已通过',
-        afterContent: `状态: 已出库, 出库${req.items.length}项物料`,
-        remark: '领用出库，自动扣减库存',
+        beforeContent: `状态: 已通过`,
+        afterContent: `状态: 已出库, 出库${updatedItems.length}项物料 [${summary}]`,
+        remark: '领用出库，已同步扣减对应批次/耗材库存台账，并登记出入库明细',
       })
 
       resolve(records[index])
