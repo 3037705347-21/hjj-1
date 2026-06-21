@@ -114,7 +114,6 @@ const filterFields: FilterField[] = [
     { label: '过期', value: 'expired' },
   ]},
   { key: 'storageCondition', label: '存储条件', type: 'select', options: storageConditions.map((s) => ({ label: s, value: s })) },
-  { key: 'storageLocation', label: '库位', type: 'input', placeholder: '输入库位关键词' },
   { key: 'operator', label: '操作人', type: 'input', placeholder: '输入操作人' },
   { key: 'productionDate', label: '生产日期', type: 'date-range' },
   { key: 'expiryDate', label: '有效期', type: 'date-range' },
@@ -184,10 +183,13 @@ const batchEditFields = ref<BatchEditField[]>([])
 const batchEditLoading = ref(false)
 
 const showLocationSelector = ref(false)
-const locationSelectorMode = ref<'create' | 'batch'>('create')
+const locationSelectorMode = ref<'create' | 'batch' | 'filter'>('create')
 const allLocationsCache = ref<StorageLocation[]>([])
 const createFormLocationId = ref('')
+const createFormLocationLabel = ref('')
 const batchEditLocationId = ref('')
+const filterLocationId = ref('')
+const filterLocationLabel = ref('')
 
 const getLocationDisplay = (locationText: string): string => {
   if (!locationText) return ''
@@ -217,6 +219,7 @@ const handleCreateLocationConfirm = (locId: string, location?: StorageLocation) 
   createFormLocationId.value = locId
   createForm.storageLocation = location ? `${location.code}` : createForm.storageLocation
   createForm.locationId = locId
+  createFormLocationLabel.value = location ? `${location.code} ${location.name}` : ''
   showLocationSelector.value = false
 }
 
@@ -232,6 +235,27 @@ const handleBatchEditLocationConfirm = (locId: string, location?: StorageLocatio
     handleBatchEditConfirm({ storageLocation: location.code, locationId: locId })
   }
   showLocationSelector.value = false
+}
+const handleLocationConfirm = (locId: string, location?: StorageLocation) => {
+  if (locationSelectorMode.value === 'create') {
+    handleCreateLocationConfirm(locId, location)
+  } else if (locationSelectorMode.value === 'filter') {
+    handleFilterLocationConfirm(locId, location)
+  } else {
+    handleBatchEditLocationConfirm(locId, location)
+  }
+}
+const openFilterLocationSelector = () => {
+  filterLocationId.value = ''
+  locationSelectorMode.value = 'filter'
+  showLocationSelector.value = true
+}
+const handleFilterLocationConfirm = (locId: string, location?: StorageLocation) => {
+  filterLocationId.value = locId
+  filterLocationLabel.value = location ? `${location.code} ${location.name}` : ''
+  filters.value.storageLocation = location ? location.code : ''
+  showLocationSelector.value = false
+  handleSearch()
 }
 
 const showPrintDialog = ref(false)
@@ -257,6 +281,7 @@ const fetchData = async () => {
       reagentId: f.reagentId || undefined,
       status: f.status || undefined,
       storageLocation: f.storageLocation || undefined,
+      locationId: filterLocationId.value || undefined,
       storageCondition: f.storageCondition || undefined,
       operator: f.operator || undefined,
       productionDateStart: f.productionDate?.[0] || undefined,
@@ -283,6 +308,19 @@ const handleSearch = () => {
 }
 
 const handleReset = () => {
+  filters.value = {
+    keyword: '',
+    status: '',
+    reagentId: '',
+    storageLocation: '',
+    storageCondition: '',
+    receivedDate: ['', ''],
+    productionDate: ['', ''],
+    expiryDate: ['', ''],
+    operator: '',
+  }
+  filterLocationId.value = ''
+  filterLocationLabel.value = ''
   pagination.page = 1
   fetchData()
 }
@@ -339,17 +377,7 @@ const handleBatchAction = (action: string) => {
       showBatchDeleteConfirm.value = true
       break
     case 'location':
-      batchEditType.value = 'location'
-      batchEditFields.value = [
-        {
-          key: 'storageLocation',
-          label: '库位',
-          type: 'input',
-          required: true,
-          placeholder: '请输入库位',
-        },
-      ]
-      showBatchEditDialog.value = true
+      openBatchEditLocationSelector()
       break
     case 'freeze':
       handleBatchStatusUpdate('freeze')
@@ -489,6 +517,7 @@ const openCreateModal = () => {
     receivedDate: formatDate(new Date()),
     remark: '',
   })
+  createFormLocationLabel.value = ''
   showCreateModal.value = true
 }
 
@@ -756,6 +785,28 @@ onMounted(() => {
       @apply-filter="handleApplyFilter"
       @delete-filter="handleDeleteFilter"
     />
+
+    <div class="flex flex-wrap items-center gap-3">
+      <button
+        type="button"
+        class="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:border-primary-400 hover:bg-primary-50 transition-all flex items-center gap-2"
+        :class="filterLocationId ? 'border-primary-300 bg-primary-50 text-primary-700' : 'text-gray-600'"
+        @click="openFilterLocationSelector"
+      >
+        <MapPin class="w-4 h-4 flex-shrink-0" />
+        <span v-if="filterLocationLabel" class="truncate max-w-[240px]">库位：{{ filterLocationLabel }}</span>
+        <span v-else>库位筛选</span>
+        <ChevronRight class="w-3.5 h-3.5 text-gray-400 flex-shrink-0 -rotate-90" />
+      </button>
+      <button
+        v-if="filterLocationId"
+        type="button"
+        class="px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded-lg transition-colors"
+        @click="filterLocationId = ''; filterLocationLabel = ''; filters.value.storageLocation = ''; handleSearch()"
+      >
+        <X class="w-4 h-4" />
+      </button>
+    </div>
 
     <div class="flex items-center gap-3 mb-2">
       <div class="flex-1 max-w-md">
@@ -1160,12 +1211,26 @@ onMounted(() => {
             <label class="block text-sm font-medium text-gray-700 mb-1.5">
               存放位置 <span class="text-red-500">*</span>
             </label>
-            <input
-              v-model="createForm.storageLocation"
-              type="text"
-              class="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all"
-              placeholder="如：A-01-03"
-            >
+            <div class="flex items-center gap-2">
+              <button
+                type="button"
+                class="flex-1 px-4 py-2.5 border border-gray-200 rounded-lg text-left hover:border-primary-400 focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 outline-none transition-all flex items-center gap-2"
+                @click="openCreateLocationSelector"
+              >
+                <MapPin class="w-4 h-4 text-gray-400 flex-shrink-0" />
+                <span v-if="createFormLocationLabel" class="text-gray-900 truncate">{{ createFormLocationLabel }}</span>
+                <span v-else class="text-gray-400">请选择库位</span>
+              </button>
+              <button
+                v-if="createForm.locationId"
+                type="button"
+                class="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                title="清除选择"
+                @click="createForm.storageLocation = ''; createForm.locationId = ''; createFormLocationLabel = ''"
+              >
+                <X class="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
           <div>
@@ -1715,6 +1780,13 @@ onMounted(() => {
       :default-entity-type="scanEntityType"
       :default-entity-id="scanEntityId"
       @close="showScanResult = false"
+    />
+
+    <LocationSelector
+      v-model:visible="showLocationSelector"
+      :model-value="locationSelectorMode === 'create' ? createFormLocationId : (locationSelectorMode === 'filter' ? filterLocationId : batchEditLocationId)"
+      :only-enabled="true"
+      @confirm="handleLocationConfirm"
     />
   </div>
 </template>

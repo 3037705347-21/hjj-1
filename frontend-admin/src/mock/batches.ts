@@ -12,7 +12,7 @@ import { mockGetAllReagents } from './reagents'
 import { storage } from '@/utils/storage'
 import type { User } from '@/types/user'
 import { addAuditLog } from './audit'
-import { getLocationsFromStorage } from './locations'
+import { getLocationsFromStorage, getLocationDescendants } from './locations'
 
 const BATCH_STORAGE_KEY = 'mock_batches'
 const OPERATION_STORAGE_KEY = 'mock_batch_operations'
@@ -330,6 +330,7 @@ export interface BatchFilterParams {
   reagentId?: string
   status?: string
   storageLocation?: string
+  locationId?: string
   productionDateStart?: string
   productionDateEnd?: string
   expiryDateStart?: string
@@ -361,6 +362,7 @@ export async function mockGetBatches(
           reagentId,
           status,
           storageLocation,
+          locationId,
           productionDateStart,
           productionDateEnd,
           expiryDateStart,
@@ -394,7 +396,13 @@ export async function mockGetBatches(
           batches = batches.filter((b) => b.status === status)
         }
 
-        if (storageLocation) {
+        if (locationId) {
+          const allLocations = getLocationsFromStorage()
+          const validLocationIds = new Set<string>([locationId])
+          const descendants = getLocationDescendants(allLocations, locationId)
+          descendants.forEach(loc => validLocationIds.add(loc.id))
+          batches = batches.filter((b) => b.locationId && validLocationIds.has(b.locationId))
+        } else if (storageLocation) {
           const sl = storageLocation.toLowerCase()
           batches = batches.filter((b) => b.storageLocation.toLowerCase().includes(sl))
         }
@@ -1157,6 +1165,7 @@ export interface BatchFilterParams {
   reagentId?: string
   status?: string
   storageLocation?: string
+  locationId?: string
   storageCondition?: string
   operator?: string
   productionDateStart?: string
@@ -1178,6 +1187,7 @@ export async function mockExportAllBatches(filters?: BatchFilterParams): Promise
           reagentId,
           status,
           storageLocation,
+          locationId,
           productionDateStart,
           productionDateEnd,
           expiryDateStart,
@@ -1204,7 +1214,13 @@ export async function mockExportAllBatches(filters?: BatchFilterParams): Promise
           batches = batches.filter((b) => b.status === status)
         }
 
-        if (storageLocation) {
+        if (locationId) {
+          const allLocations = getLocationsFromStorage()
+          const validLocationIds = new Set<string>([locationId])
+          const descendants = getLocationDescendants(allLocations, locationId)
+          descendants.forEach(loc => validLocationIds.add(loc.id))
+          batches = batches.filter((b) => b.locationId && validLocationIds.has(b.locationId))
+        } else if (storageLocation) {
           const sl = storageLocation.toLowerCase()
           batches = batches.filter((b) => b.storageLocation.toLowerCase().includes(sl))
         }
