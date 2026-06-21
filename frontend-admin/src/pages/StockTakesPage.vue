@@ -851,4 +851,4 @@ onMounted(() => {
       @confirm="confirmDelete"
     />
   </div>
-</script>
+</template>
