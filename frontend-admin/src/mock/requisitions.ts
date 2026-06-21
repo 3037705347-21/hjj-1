@@ -35,16 +35,124 @@ function getCurrentUser(): User | null {
   return storage.getUser<User>()
 }
 
-function getRequisitionsFromStorage(): Requisition[] {
+const MIGRATION_VERSION = 1
+const VERSION_KEY = 'mock_requisitions_version'
+
+const fallbackPrices: Record<string, number> = {
+  '胰蛋白酶': 350,
+  '1.5mL 离心管': 45,
+  'Taq DNA 聚合酶': 650,
+  'dNTP Mix': 120,
+  '200μL 吸头': 68,
+  'PBS缓冲液': 85,
+  '96孔ELISA板': 350,
+  'SDS-PAGE凝胶': 120,
+  '转膜缓冲液': 95,
+  'PVDF膜': 180,
+  'LB培养基': 150,
+  '培养皿': 55,
+}
+
+async function buildMaterialPriceMap(): Promise<Map<string, number>> {
+  const [reagents, consumables] = await Promise.all([
+    mockGetAllReagents(),
+    getConsumablesFromStorage(),
+  ])
+
+  const priceMap = new Map<string, number>()
+
+  reagents.forEach((r) => {
+    if (r.name) {
+      priceMap.set(r.name.trim().normalize(), r.unitPrice || 0)
+    }
+    if (r.id) {
+      priceMap.set(r.id, r.unitPrice || 0)
+    }
+  })
+
+  consumables.forEach((c) => {
+    if (c.name) {
+      priceMap.set(c.name.trim().normalize(), c.unitPrice || 0)
+    }
+    if (c.id) {
+      priceMap.set(c.id, c.unitPrice || 0)
+    }
+  })
+
+  Object.entries(fallbackPrices).forEach(([name, price]) => {
+    const key = name.trim().normalize()
+    if (!priceMap.has(key)) {
+      priceMap.set(key, price)
+    }
+  })
+
+  return priceMap
+}
+
+async function migrateRequisitionPrices(records: Requisition[]): Promise<Requisition[]> {
+  const priceMap = await buildMaterialPriceMap()
+  const costRelevantStatuses: RequisitionStatus[] = ['outbound', 'used', 'approved']
+
+  return records.map((req) => ({
+    ...req,
+    items: req.items.map((item) => {
+      if (item.unitPrice !== undefined || !costRelevantStatuses.includes(req.status)) {
+        return item
+      }
+
+      const nameKey = item.materialName?.trim().normalize()
+      let price = 0
+
+      if (nameKey && priceMap.has(nameKey)) {
+        price = priceMap.get(nameKey)!
+      } else if (item.materialId && priceMap.has(item.materialId)) {
+        price = priceMap.get(item.materialId)!
+      }
+
+      if (price > 0) {
+        const qty = item.actualQuantity ?? item.expectedQuantity ?? 0
+        return {
+          ...item,
+          unitPrice: price,
+          totalCost: Number((qty * price).toFixed(2)),
+        }
+      }
+
+      return item
+    }),
+  }))
+}
+
+function needsMigration(records: Requisition[]): boolean {
+  const costRelevantStatuses: RequisitionStatus[] = ['outbound', 'used', 'approved']
+  return records.some((req) =>
+    costRelevantStatuses.includes(req.status) &&
+    req.items.some((item) => item.unitPrice === undefined)
+  )
+}
+
+async function getRequisitionsFromStorage(): Promise<Requisition[]> {
   const data = localStorage.getItem(STORAGE_KEY)
   if (data) {
     try {
-      return JSON.parse(data)
+      const records: Requisition[] = JSON.parse(data)
+      const currentVersion = Number(localStorage.getItem(VERSION_KEY) || 0)
+
+      if (currentVersion < MIGRATION_VERSION || needsMigration(records)) {
+        const migrated = await migrateRequisitionPrices(records)
+        saveRequisitionsToStorage(migrated)
+        localStorage.setItem(VERSION_KEY, String(MIGRATION_VERSION))
+        return migrated
+      }
+
+      return records
     } catch {
       return []
     }
   }
-  return initMockRequisitions()
+  const initialData = initMockRequisitions()
+  localStorage.setItem(VERSION_KEY, String(MIGRATION_VERSION))
+  return initialData
 }
 
 function saveRequisitionsToStorage(items: Requisition[]): void {
@@ -74,8 +182,8 @@ function initMockRequisitions(): Requisition[] {
       usagePurpose: '蛋白质组学质谱分析前处理',
       usageTime: formatDate(new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000), 'YYYY-MM-DD HH:mm'),
       items: [
-        { id: generateId(), materialType: 'reagent', materialId: 'req_001', materialName: '胰蛋白酶', specification: '100mg', unit: 'mg', expectedQuantity: 5, actualQuantity: 5, stockBefore: 100, stockAfter: 95 },
-        { id: generateId(), materialType: 'consumable', materialId: 'con_001', materialName: '1.5mL 离心管', specification: '500个/包', unit: '包', expectedQuantity: 2, actualQuantity: 2, stockBefore: 25, stockAfter: 23 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_001', materialName: '胰蛋白酶', specification: '100mg', unit: 'mg', expectedQuantity: 5, actualQuantity: 5, stockBefore: 100, stockAfter: 95, unitPrice: 350, totalCost: 1750 },
+        { id: generateId(), materialType: 'consumable', materialId: 'con_001', materialName: '1.5mL 离心管', specification: '500个/包', unit: '包', expectedQuantity: 2, actualQuantity: 2, stockBefore: 25, stockAfter: 23, unitPrice: 45, totalCost: 90 },
       ],
       status: 'used',
       approverId: 'user_admin_1',
@@ -100,9 +208,9 @@ function initMockRequisitions(): Requisition[] {
       usagePurpose: 'CRISPR-Cas9基因编辑实验',
       usageTime: formatDate(new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000), 'YYYY-MM-DD HH:mm'),
       items: [
-        { id: generateId(), materialType: 'reagent', materialId: 'req_002', materialName: 'Taq DNA 聚合酶', specification: '500U', unit: 'U', expectedQuantity: 100, actualQuantity: 100, stockBefore: 500, stockAfter: 400 },
-        { id: generateId(), materialType: 'reagent', materialId: 'req_003', materialName: 'dNTP Mix', specification: '10mM', unit: 'μL', expectedQuantity: 50, actualQuantity: 50, stockBefore: 1000, stockAfter: 950 },
-        { id: generateId(), materialType: 'consumable', materialId: 'con_002', materialName: '200μL 吸头', specification: '1000个/盒', unit: '盒', expectedQuantity: 3, actualQuantity: 3, stockBefore: 10, stockAfter: 7 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_002', materialName: 'Taq DNA 聚合酶', specification: '500U', unit: 'U', expectedQuantity: 100, actualQuantity: 100, stockBefore: 500, stockAfter: 400, unitPrice: 650, totalCost: 65000 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_003', materialName: 'dNTP Mix', specification: '10mM', unit: 'μL', expectedQuantity: 50, actualQuantity: 50, stockBefore: 1000, stockAfter: 950, unitPrice: 120, totalCost: 6000 },
+        { id: generateId(), materialType: 'consumable', materialId: 'con_002', materialName: '200μL 吸头', specification: '1000个/盒', unit: '盒', expectedQuantity: 3, actualQuantity: 3, stockBefore: 10, stockAfter: 7, unitPrice: 68, totalCost: 204 },
       ],
       status: 'outbound',
       approverId: 'user_manager_1',
@@ -124,8 +232,8 @@ function initMockRequisitions(): Requisition[] {
       usagePurpose: 'ELISA法筛选单克隆抗体',
       usageTime: formatDate(now, 'YYYY-MM-DD HH:mm'),
       items: [
-        { id: generateId(), materialType: 'reagent', materialId: 'req_004', materialName: 'PBS缓冲液', specification: '500mL', unit: '瓶', expectedQuantity: 5 },
-        { id: generateId(), materialType: 'consumable', materialId: 'con_003', materialName: '96孔ELISA板', specification: '50个/盒', unit: '盒', expectedQuantity: 2 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_004', materialName: 'PBS缓冲液', specification: '500mL', unit: '瓶', expectedQuantity: 5, unitPrice: 85, totalCost: 425 },
+        { id: generateId(), materialType: 'consumable', materialId: 'con_003', materialName: '96孔ELISA板', specification: '50个/盒', unit: '盒', expectedQuantity: 2, unitPrice: 350, totalCost: 700 },
       ],
       status: 'pending',
       remark: '抗体筛选实验，需要大量PBS和ELISA板',
@@ -141,9 +249,9 @@ function initMockRequisitions(): Requisition[] {
       usagePurpose: 'Western Blot检测MAPK通路蛋白',
       usageTime: formatDate(new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), 'YYYY-MM-DD HH:mm'),
       items: [
-        { id: generateId(), materialType: 'reagent', materialId: 'req_005', materialName: 'SDS-PAGE凝胶', specification: '10%', unit: '块', expectedQuantity: 4, actualQuantity: 4, stockBefore: 20, stockAfter: 16 },
-        { id: generateId(), materialType: 'reagent', materialId: 'req_006', materialName: '转膜缓冲液', specification: '1L', unit: '瓶', expectedQuantity: 2, actualQuantity: 2, stockBefore: 8, stockAfter: 6 },
-        { id: generateId(), materialType: 'consumable', materialId: 'con_004', materialName: 'PVDF膜', specification: '20cm×20cm', unit: '张', expectedQuantity: 4, actualQuantity: 4, stockBefore: 15, stockAfter: 11 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_005', materialName: 'SDS-PAGE凝胶', specification: '10%', unit: '块', expectedQuantity: 4, actualQuantity: 4, stockBefore: 20, stockAfter: 16, unitPrice: 120, totalCost: 480 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_006', materialName: '转膜缓冲液', specification: '1L', unit: '瓶', expectedQuantity: 2, actualQuantity: 2, stockBefore: 8, stockAfter: 6, unitPrice: 95, totalCost: 190 },
+        { id: generateId(), materialType: 'consumable', materialId: 'con_004', materialName: 'PVDF膜', specification: '20cm×20cm', unit: '张', expectedQuantity: 4, actualQuantity: 4, stockBefore: 15, stockAfter: 11, unitPrice: 180, totalCost: 720 },
       ],
       status: 'used',
       approverId: 'user_admin_1',
@@ -168,7 +276,7 @@ function initMockRequisitions(): Requisition[] {
       usagePurpose: 'Western Blot验证蛋白表达',
       usageTime: formatDate(new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000), 'YYYY-MM-DD HH:mm'),
       items: [
-        { id: generateId(), materialType: 'reagent', materialId: 'req_005', materialName: 'SDS-PAGE凝胶', specification: '10%', unit: '块', expectedQuantity: 2, actualQuantity: 2, stockBefore: 22, stockAfter: 20 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_005', materialName: 'SDS-PAGE凝胶', specification: '10%', unit: '块', expectedQuantity: 2, actualQuantity: 2, stockBefore: 22, stockAfter: 20, unitPrice: 120, totalCost: 240 },
       ],
       status: 'rejected',
       approverId: 'user_manager_1',
@@ -187,8 +295,8 @@ function initMockRequisitions(): Requisition[] {
       usagePurpose: '细菌培养与药敏实验',
       usageTime: formatDate(new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000), 'YYYY-MM-DD HH:mm'),
       items: [
-        { id: generateId(), materialType: 'reagent', materialId: 'req_007', materialName: 'LB培养基', specification: '500g', unit: 'g', expectedQuantity: 100, actualQuantity: 100, stockBefore: 500, stockAfter: 400 },
-        { id: generateId(), materialType: 'consumable', materialId: 'con_005', materialName: '培养皿', specification: '90mm', unit: '包', expectedQuantity: 5, actualQuantity: 5, stockBefore: 30, stockAfter: 25 },
+        { id: generateId(), materialType: 'reagent', materialId: 'req_007', materialName: 'LB培养基', specification: '500g', unit: 'g', expectedQuantity: 100, actualQuantity: 100, stockBefore: 500, stockAfter: 400, unitPrice: 150, totalCost: 15000 },
+        { id: generateId(), materialType: 'consumable', materialId: 'con_005', materialName: '培养皿', specification: '90mm', unit: '包', expectedQuantity: 5, actualQuantity: 5, stockBefore: 30, stockAfter: 25, unitPrice: 55, totalCost: 275 },
       ],
       status: 'used',
       approverId: 'user_admin_1',
@@ -225,8 +333,8 @@ export async function mockGetRequisitions(
   filters?: RequisitionFilterParams
 ): Promise<PageResult<Requisition>> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      let records = getRequisitionsFromStorage()
+    setTimeout(async () => {
+      let records = await getRequisitionsFromStorage()
 
       if (filters) {
         if (filters.keyword) {
@@ -280,8 +388,8 @@ export async function mockGetRequisitions(
 
 export async function mockGetRequisition(id: string): Promise<Requisition | null> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      const records = getRequisitionsFromStorage()
+    setTimeout(async () => {
+      const records = await getRequisitionsFromStorage()
       resolve(records.find((r) => r.id === id) || null)
     }, 100)
   })
@@ -289,14 +397,14 @@ export async function mockGetRequisition(id: string): Promise<Requisition | null
 
 export async function mockCreateRequisition(data: RequisitionFormData): Promise<Requisition> {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
         reject(new Error('用户未登录'))
         return
       }
 
-      const records = getRequisitionsFromStorage()
+      const records = await getRequisitionsFromStorage()
       const now = formatDate(new Date())
       const newReq: Requisition = {
         id: generateId(),
@@ -342,14 +450,14 @@ export async function mockApproveRequisition(
   remark?: string
 ): Promise<Requisition> {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
         reject(new Error('用户未登录'))
         return
       }
 
-      const records = getRequisitionsFromStorage()
+      const records = await getRequisitionsFromStorage()
       const index = records.findIndex((r) => r.id === id)
       if (index === -1) {
         reject(new Error('领用记录不存在'))
@@ -388,14 +496,14 @@ export async function mockRejectRequisition(
   reason: string
 ): Promise<Requisition> {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
         reject(new Error('用户未登录'))
         return
       }
 
-      const records = getRequisitionsFromStorage()
+      const records = await getRequisitionsFromStorage()
       const index = records.findIndex((r) => r.id === id)
       if (index === -1) {
         reject(new Error('领用记录不存在'))
@@ -431,7 +539,7 @@ export async function mockRejectRequisition(
 }
 
 export async function mockOutboundRequisition(id: string): Promise<Requisition> {
-  return new Promise(async (resolve, reject) => {
+  return new Promise((resolve, reject) => {
     setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
@@ -439,7 +547,7 @@ export async function mockOutboundRequisition(id: string): Promise<Requisition> 
         return
       }
 
-      const records = getRequisitionsFromStorage()
+      const records = await getRequisitionsFromStorage()
       const index = records.findIndex((r) => r.id === id)
       if (index === -1) {
         reject(new Error('领用记录不存在'))
@@ -610,14 +718,14 @@ export async function mockRegisterUsage(
   actualQuantities: Record<string, number>
 ): Promise<Requisition> {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
         reject(new Error('用户未登录'))
         return
       }
 
-      const records = getRequisitionsFromStorage()
+      const records = await getRequisitionsFromStorage()
       const index = records.findIndex((r) => r.id === id)
       if (index === -1) {
         reject(new Error('领用记录不存在'))
@@ -660,14 +768,14 @@ export async function mockRegisterUsage(
 
 export async function mockCancelRequisition(id: string): Promise<Requisition> {
   return new Promise((resolve, reject) => {
-    setTimeout(() => {
+    setTimeout(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser) {
         reject(new Error('用户未登录'))
         return
       }
 
-      const records = getRequisitionsFromStorage()
+      const records = await getRequisitionsFromStorage()
       const index = records.findIndex((r) => r.id === id)
       if (index === -1) {
         reject(new Error('领用记录不存在'))
@@ -700,9 +808,8 @@ export async function mockCancelRequisition(id: string): Promise<Requisition> {
 
 export async function mockGetRequisitionStats(): Promise<RequisitionStats> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      const records = getRequisitionsFromStorage()
-      const currentUser = getCurrentUser()
+    setTimeout(async () => {
+      const records = await getRequisitionsFromStorage()
       resolve({
         totalRequisitions: records.length,
         pendingCount: records.filter((r) => r.status === 'pending').length,
@@ -722,8 +829,8 @@ export async function mockGetRequisitionStats(): Promise<RequisitionStats> {
 
 export async function mockGetProjectConsumption(): Promise<ProjectConsumptionStat[]> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      const records = getRequisitionsFromStorage().filter((r) => r.status === 'used' || r.status === 'outbound')
+    setTimeout(async () => {
+      const records = (await getRequisitionsFromStorage()).filter((r) => r.status === 'used' || r.status === 'outbound')
       const map = new Map<string, ProjectConsumptionStat>()
 
       records.forEach((r) => {
@@ -744,17 +851,17 @@ export async function mockGetProjectConsumption(): Promise<ProjectConsumptionSta
         const stat = map.get(key)!
         r.items.forEach((item) => {
           stat.totalItems++
-          const qty = item.actualQuantity || item.expectedQuantity
-          const cost = item.totalCost || (item.unitPrice ? qty * item.unitPrice : 0)
+          const qty = item.actualQuantity ?? item.expectedQuantity ?? 0
+          const cost = item.totalCost ?? Number(((item.unitPrice ?? 0) * qty).toFixed(2))
           stat.totalQuantity += qty
           if (item.materialType === 'reagent') {
             stat.reagentQuantity += qty
-            stat.reagentCost += cost
+            stat.reagentCost = Number((stat.reagentCost + cost).toFixed(2))
           } else {
             stat.consumableQuantity += qty
-            stat.consumableCost += cost
+            stat.consumableCost = Number((stat.consumableCost + cost).toFixed(2))
           }
-          stat.totalCost = stat.reagentCost + stat.consumableCost
+          stat.totalCost = Number((stat.reagentCost + stat.consumableCost).toFixed(2))
         })
       })
 
@@ -765,8 +872,8 @@ export async function mockGetProjectConsumption(): Promise<ProjectConsumptionSta
 
 export async function mockGetTopicCost(): Promise<TopicCostStat[]> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      const records = getRequisitionsFromStorage().filter((r) => r.status === 'used' || r.status === 'outbound')
+    setTimeout(async () => {
+      const records = (await getRequisitionsFromStorage()).filter((r) => r.status === 'used' || r.status === 'outbound')
       const map = new Map<string, TopicCostStat>()
 
       records.forEach((r) => {
@@ -785,15 +892,15 @@ export async function mockGetTopicCost(): Promise<TopicCostStat[]> {
         const stat = map.get(key)!
         stat.totalRequisitions++
         r.items.forEach((item) => {
-          const qty = item.actualQuantity || item.expectedQuantity
-          const cost = item.totalCost || (item.unitPrice ? qty * item.unitPrice : 0)
+          const qty = item.actualQuantity ?? item.expectedQuantity ?? 0
+          const cost = item.totalCost ?? Number(((item.unitPrice ?? 0) * qty).toFixed(2))
           stat.totalQuantity += qty
           if (item.materialType === 'reagent') {
-            stat.reagentCost += cost
+            stat.reagentCost = Number((stat.reagentCost + cost).toFixed(2))
           } else {
-            stat.consumableCost += cost
+            stat.consumableCost = Number((stat.consumableCost + cost).toFixed(2))
           }
-          stat.totalCost = stat.reagentCost + stat.consumableCost
+          stat.totalCost = Number((stat.reagentCost + stat.consumableCost).toFixed(2))
         })
       })
 
@@ -804,8 +911,8 @@ export async function mockGetTopicCost(): Promise<TopicCostStat[]> {
 
 export async function mockGetUserUsage(): Promise<UserUsageStat[]> {
   return new Promise((resolve) => {
-    setTimeout(() => {
-      const records = getRequisitionsFromStorage().filter((r) => r.status === 'used' || r.status === 'outbound')
+    setTimeout(async () => {
+      const records = (await getRequisitionsFromStorage()).filter((r) => r.status === 'used' || r.status === 'outbound')
       const map = new Map<string, UserUsageStat>()
 
       records.forEach((r) => {
@@ -828,16 +935,16 @@ export async function mockGetUserUsage(): Promise<UserUsageStat[]> {
         stat.requisitionCount++
         r.items.forEach((item) => {
           stat.totalItems++
-          const qty = item.actualQuantity || item.expectedQuantity
-          const cost = item.totalCost || (item.unitPrice ? qty * item.unitPrice : 0)
+          const qty = item.actualQuantity ?? item.expectedQuantity ?? 0
+          const cost = item.totalCost ?? Number(((item.unitPrice ?? 0) * qty).toFixed(2))
           if (item.materialType === 'reagent') {
             stat.reagentCount++
-            stat.reagentCost += cost
+            stat.reagentCost = Number((stat.reagentCost + cost).toFixed(2))
           } else {
             stat.consumableCount++
-            stat.consumableCost += cost
+            stat.consumableCost = Number((stat.consumableCost + cost).toFixed(2))
           }
-          stat.totalCost = stat.reagentCost + stat.consumableCost
+          stat.totalCost = Number((stat.reagentCost + stat.consumableCost).toFixed(2))
         })
       })
 
