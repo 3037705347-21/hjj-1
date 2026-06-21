@@ -228,8 +228,12 @@ const handleBatchEditSubmit = async () => {
 }
 
 const openConfirmModal = () => {
-  if (data.value?.status !== 'to_confirm') {
-    alert('只能确认待确认状态的盘点任务')
+  if (data.value?.status !== 'in_progress' && data.value?.status !== 'to_confirm') {
+    alert('只能确认盘点中或待确认状态的盘点任务')
+    return
+  }
+  if (data.value?.checkedItems !== data.value?.totalItems || data.value?.totalItems === 0) {
+    alert('请先完成所有盘点项的录入')
     return
   }
   confirmForm.confirmRemark = ''
@@ -299,7 +303,7 @@ onMounted(() => {
           批量录入
         </button>
         <button
-          v-if="canConfirm && data?.status === 'in_progress' && data?.checkedItems === data?.totalItems && data?.totalItems > 0"
+          v-if="canConfirm && (data?.status === 'in_progress' || data?.status === 'to_confirm') && data?.checkedItems === data?.totalItems && data?.totalItems > 0"
           class="flex items-center gap-2 px-4 py-2 bg-warning-600 hover:bg-warning-700 text-white rounded-lg transition-colors font-medium"
           @click="openConfirmModal"
         >
